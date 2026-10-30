@@ -42,6 +42,8 @@ jobs:
           sudo apt-get install -y -qq sshpass >/dev/null
           u_raw="$DEPLOY_USER"; DEPLOY_USER="$(echo -n "$DEPLOY_USER" | tr -d '[:space:]')"; DEPLOY_HOST="$(echo -n "$DEPLOY_HOST" | tr -d '[:space:]')"
           [ "$u_raw" != "$DEPLOY_USER" ] && echo "ВНИМАНИЕ: в DEPLOY_USER были пробелы или перевод строки, убраны для проверки"
+          if [ "$DEPLOY_USER" = "h551249" ]; then echo "DEPLOY_USER совпадает с логином SSH h551249"; else echo "DEPLOY_USER НЕ совпадает с логином SSH h551249"; fi
+          if [ "$DEPLOY_HOST" = "ssh.hosting.masterhost.ru" ]; then echo "DEPLOY_HOST верный"; else echo "DEPLOY_HOST НЕ равен ssh.hosting.masterhost.ru"; fi
           p_trim="$(printf '%s' "$SSHPASS" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
           [ "$p_trim" != "$SSHPASS" ] && echo "ВНИМАНИЕ: в DEPLOY_PASSWORD пробелы или перевод строки по краям"
           sshpass -e ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$DEPLOY_USER@$DEPLOY_HOST" '
