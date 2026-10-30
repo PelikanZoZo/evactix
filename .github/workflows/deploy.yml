@@ -58,13 +58,11 @@ jobs:
 
       - name: Проверка сайта
         run: |
-          sleep 5
-          for i in 1 2 3 4 5 6; do
-            body="$(curl -s -L --max-time 20 https://evactix.ru/ || true)"
-            if echo "$body" | grep -q 'aria-label="Evactix"'; then
-              ok=0; for k in $(seq 1 12); do curl -s -L --max-time 15 https://evactix.ru/ | grep -q 'aria-label="Evactix"' && ok=$((ok+1)); done
-              echo "evactix.ru отдаёт новую заглушку: $ok из 12 запросов"; [ $ok -eq 12 ] && exit 0
-            fi
-            echo "Пока не обновилось (попытка $i): $(echo "$body" | head -c 120)"; sleep 10
+          # хостинг притормаживает частые запросы, поэтому проверяем бережно
+          sleep 10
+          for i in 1 2 3 4 5 6 7 8; do
+            code=$(curl -s -L --max-time 20 -o page.html -w '%{http_code}' https://evactix.ru/ || true)
+            if [ "$code" = "200" ] && grep -q 'aria-label="Evactix"' page.html; then echo "evactix.ru отдаёт новую версию (попытка $i)"; exit 0; fi
+            echo "Пока не готово (попытка $i): код $code"; sleep 10
           done
           echo "Сайт не отдаёт новую версию"; exit 1
