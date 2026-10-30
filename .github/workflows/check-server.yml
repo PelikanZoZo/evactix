@@ -61,6 +61,8 @@ jobs:
             echo "--- MySQL-клиент:"; (mysql --version 2>/dev/null || echo "mysql не найден")
             echo "--- .nvmrc:"; cat ~/.nvmrc 2>/dev/null
             for d in evactix.ru evactix.com; do echo "--- ~/$d:"; ls -la ~/$d 2>/dev/null; for sub in ~/$d/*; do [ -d "$sub" ] && { echo "  $sub:"; ls -la "$sub" | head -15; }; done; done
+            echo "--- app.js (evactix.ru):"; cat ~/evactix.ru/www/app.js; echo; echo "--- node_modules:"; ls -la ~/evactix.ru/www/node_modules; ls ~/evactix.ru/www/node_modules/* 2>/dev/null | head -20
+            echo "--- devalby app.js (для сравнения):"; head -c 600 ~/devalby.ru/www/app.js 2>/dev/null; echo
             echo "--- где Node.js:"; ls -d /opt/node* /opt/nodejs* /usr/local/node* /opt/alt/*node* 2>/dev/null | head; ls /usr/bin | grep -i -E "^node|^unit" | head; (bash -lc "node -v" 2>/dev/null || true)
           '
 
