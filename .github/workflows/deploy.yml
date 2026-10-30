@@ -46,7 +46,11 @@ jobs:
               cp "$N/app.js" "$W/app.js.new" && mv -f "$W/app.js.new" "$W/app.js"
               rm -rf "$N" "$W/public.old"
               echo "Файлы на месте:"; ls -la "$W" "$W/public"
-              echo "Процессы приложения:"; ps -u "$(id -u)" -o pid,args | grep -i -E "evactix|unit" | grep -v grep || true
+              # перезапуск: завершаем только процессы Node.js, работающие из папки evactix.ru (devalby.ru не трогаем)
+              WR="$(readlink -f "$W")"
+              for pid in $(pgrep -u "$(id -u)" -f "unit-http/loader app.js" || true); do
+                if [ "$(readlink -f /proc/$pid/cwd 2>/dev/null)" = "$WR" ]; then kill "$pid" 2>/dev/null && echo "перезапущен процесс $pid"; fi
+              done
             ' < site.tgz; then echo "Загружено"; exit 0; fi
             sleep 15
           done
@@ -57,7 +61,10 @@ jobs:
           sleep 5
           for i in 1 2 3 4 5 6; do
             body="$(curl -s -L --max-time 20 http://evactix.ru/ || true)"
-            if echo "$body" | grep -q 'aria-label="Evactix"'; then echo "evactix.ru отдаёт новую заглушку"; exit 0; fi
+            if echo "$body" | grep -q 'aria-label="Evactix"'; then
+              ok=0; for k in $(seq 1 12); do curl -s --max-time 15 http://evactix.ru/ | grep -q 'aria-label="Evactix"' && ok=$((ok+1)); done
+              echo "evactix.ru отдаёт новую заглушку: $ok из 12 запросов"; [ $ok -eq 12 ] && exit 0
+            fi
             echo "Пока не обновилось (попытка $i): $(echo "$body" | head -c 120)"; sleep 10
           done
           echo "Сайт не отдаёт новую версию"; exit 1
