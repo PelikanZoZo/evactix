@@ -40,6 +40,10 @@ jobs:
           SSHPASS: ${{ secrets.DEPLOY_PASSWORD }}
         run: |
           sudo apt-get install -y -qq sshpass >/dev/null
+          u_raw="$DEPLOY_USER"; DEPLOY_USER="$(echo -n "$DEPLOY_USER" | tr -d '[:space:]')"; DEPLOY_HOST="$(echo -n "$DEPLOY_HOST" | tr -d '[:space:]')"
+          [ "$u_raw" != "$DEPLOY_USER" ] && echo "ВНИМАНИЕ: в DEPLOY_USER были пробелы или перевод строки, убраны для проверки"
+          p_trim="$(printf '%s' "$SSHPASS" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+          [ "$p_trim" != "$SSHPASS" ] && echo "ВНИМАНИЕ: в DEPLOY_PASSWORD пробелы или перевод строки по краям"
           sshpass -e ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$DEPLOY_USER@$DEPLOY_HOST" '
             echo "SSH: OK"; echo "Домашняя папка: $HOME"
             echo "--- Содержимое:"; ls -la ~ | head -40
@@ -55,9 +59,10 @@ jobs:
           SSHPASS: ${{ secrets.DEPLOY_PASSWORD }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
+          DEPLOY_USER="$(echo -n "$DEPLOY_USER" | tr -d '[:space:]')"; DEPLOY_HOST="$(echo -n "$DEPLOY_HOST" | tr -d '[:space:]')"
           python3 - > my.cnf <<'PY'
           import os, urllib.parse as u
-          p = u.urlparse(os.environ["DATABASE_URL"])
+          p = u.urlparse(os.environ["DATABASE_URL"].strip())
           print("[client]")
           print("user=" + u.unquote(p.username))
           print("password=" + u.unquote(p.password or ""))
