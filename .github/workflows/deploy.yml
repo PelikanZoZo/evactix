@@ -1,0 +1,63 @@
+name: Развёртывание evactix.ru
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - site/**
+      - .github/workflows/deploy.yml
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Подготовка
+        run: |
+          sudo apt-get install -y -qq sshpass >/dev/null
+          node --check site/app.js
+          tar czf site.tgz -C site .
+
+      - name: Загрузка на сервер (с повторами)
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          SSHPASS: ${{ secrets.DEPLOY_PASSWORD }}
+        run: |
+          H="$(echo -n "$DEPLOY_HOST" | tr -d '[:space:]')"; U="$(echo -n "$DEPLOY_USER" | tr -d '[:space:]')"
+          for i in 1 2 3 4 5 6; do
+            echo "Попытка $i"
+            if sshpass -e ssh -o StrictHostKeyChecking=no -o ConnectTimeout=25 -o ServerAliveInterval=10 "$U@$H" '
+              set -e
+              W=~/evactix.ru/www
+              N=~/evactix.ru/release-new
+              rm -rf "$N"; mkdir -p "$N"
+              tar xzf - -C "$N"
+              # исходную заготовку хостинга сохраняем один раз
+              [ -f ~/evactix.ru/app.js.hosting-original ] || cp "$W/app.js" ~/evactix.ru/app.js.hosting-original 2>/dev/null || true
+              rm -rf "$W/public.old"; [ -d "$W/public" ] && mv "$W/public" "$W/public.old"
+              mv "$N/public" "$W/public"
+              cp "$N/app.js" "$W/app.js.new" && mv -f "$W/app.js.new" "$W/app.js"
+              rm -rf "$N" "$W/public.old"
+              echo "Файлы на месте:"; ls -la "$W" "$W/public"
+              echo "Процессы приложения:"; ps -u "$(id -u)" -o pid,args | grep -i -E "evactix|unit" | grep -v grep || true
+            ' < site.tgz; then echo "Загружено"; exit 0; fi
+            sleep 15
+          done
+          echo "Не удалось подключиться к серверу"; exit 1
+
+      - name: Проверка сайта
+        run: |
+          sleep 5
+          for i in 1 2 3 4 5 6; do
+            body="$(curl -s -L --max-time 20 http://evactix.ru/ || true)"
+            if echo "$body" | grep -q 'aria-label="Evactix"'; then echo "evactix.ru отдаёт новую заглушку"; exit 0; fi
+            echo "Пока не обновилось (попытка $i): $(echo "$body" | head -c 120)"; sleep 10
+          done
+          echo "Сайт не отдаёт новую версию"; exit 1

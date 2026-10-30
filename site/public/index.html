@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evactix</title>
+<meta name="description" content="Evactix — система параметрического мониторинга событий">
+<meta name="theme-color" content="#0b0b0d">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  :root { --bg:#0b0b0d; --fg:#f2f2f3; --or:#ea5a0b; --muted:#6b6b72; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; }
+  body {
+    background:var(--bg); color:var(--fg);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:44px;
+    overflow:hidden; -webkit-font-smoothing:antialiased;
+  }
+  /* едва заметная сетка-матрица на фоне */
+  body::before {
+    content:""; position:fixed; inset:0; pointer-events:none;
+    background-image:
+      linear-gradient(rgba(255,255,255,.028) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.028) 1px, transparent 1px);
+    background-size:48px 48px; background-position:center;
+    -webkit-mask-image:radial-gradient(ellipse at center, #000 0%, transparent 65%);
+            mask-image:radial-gradient(ellipse at center, #000 0%, transparent 65%);
+    opacity:0; animation:fade 1.6s ease .1s forwards;
+  }
+  .logo { width:min(560px, 78vw); height:auto; display:block; overflow:visible; }
+
+  .ltr { fill:var(--fg); opacity:0; animation:ltr .7s cubic-bezier(.2,.7,.2,1) var(--t) forwards; }
+  @keyframes ltr {
+    0%   { opacity:0; fill:var(--or); transform:var(--tx) translateY(260px); }
+    35%  { opacity:1; fill:var(--or); }
+    100% { opacity:1; fill:var(--fg); }
+  }
+
+  .ghost { fill:none; stroke:rgba(255,255,255,.22); stroke-width:10; opacity:0;
+           animation:ghost 2.6s ease var(--d) forwards; }
+  @keyframes ghost { 0%{opacity:0} 12%{opacity:1} 60%{opacity:1} 100%{opacity:0} }
+
+  .cell { opacity:0; transform-box:fill-box; transform-origin:center;
+          animation:cell .45s cubic-bezier(.3,1.6,.5,1) var(--t) forwards; }
+  .cell.k { fill:var(--fg); }
+  .cell.o { fill:var(--or); filter:url(#glow);
+            animation:cell .45s cubic-bezier(.3,1.6,.5,1) var(--t) forwards,
+                      signal 6s ease-in-out 3.2s infinite; }
+  @keyframes cell { from{opacity:0; transform:scale(.3)} to{opacity:1; transform:scale(1)} }
+  /* сигнал: раз в 6 секунд оранжевые клетки «срабатывают» */
+  @keyframes signal {
+    0%,76%,100% { opacity:1; }
+    80% { opacity:.25; }
+    84% { opacity:1; }
+    88% { opacity:.25; }
+    93% { opacity:1; }
+  }
+
+  .scan { transform:translateX(-440px); animation:scan 1150ms cubic-bezier(.55,.1,.45,.9) 350ms forwards; }
+  @keyframes scan { to { transform:translateX(9912px); opacity:0; } }
+  /* короткий проход сканера по матрице — в такт сигналу */
+  .scan2 { opacity:0; transform:translateX(7836px);
+           animation:scan2 6s cubic-bezier(.5,0,.5,1) 3.2s infinite; }
+  @keyframes scan2 {
+    0%,62% { opacity:0; transform:translateX(7836px); }
+    64%    { opacity:1; }
+    78%    { opacity:1; transform:translateX(9732px); }
+    80%,100% { opacity:0; transform:translateX(9732px); }
+  }
+
+  .enter {
+    color:var(--muted); text-decoration:none; font-size:13px; letter-spacing:.32em; text-transform:uppercase;
+    padding:8px 4px 8px calc(4px + .32em); border-bottom:1px solid transparent;
+    opacity:0; animation:fade .8s ease 2.1s forwards; transition:color .25s, border-color .25s;
+  }
+  .enter:hover, .enter:focus-visible { color:var(--fg); border-bottom-color:var(--or); outline:none; }
+  @keyframes fade { to { opacity:1; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before { animation:none !important; }
+    .ltr, .cell, .enter, body::before { opacity:1; }
+    .ghost, .scan, .scan2 { display:none; }
+  }
+</style>
+</head>
+<body>
+<svg class="logo" viewBox="-40 -2150 9752 2230" role="img" aria-label="Evactix" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="beam" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#ea5a0b" stop-opacity="0"/>
+      <stop offset=".85" stop-color="#ea5a0b" stop-opacity=".18"/>
+      <stop offset="1" stop-color="#ff7a2e" stop-opacity="1"/>
+    </linearGradient>
+    <linearGradient id="fadeY" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0"/>
+      <stop offset=".2" stop-color="#fff" stop-opacity="1"/>
+      <stop offset=".8" stop-color="#fff" stop-opacity="1"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <mask id="beamMask" maskUnits="userSpaceOnUse" x="-2040" y="-2150" width="15752" height="2230">
+      <rect x="-2040" y="-2150" width="15752" height="2230" fill="url(#fadeY)"/>
+    </mask>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="40" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="word">
+<path class="ltr" style="--t:454ms;--tx:translate(0px,0);transform:var(--tx)" d="M870 30Q633 30 462.5 -66.5Q292 -163 200.0 -340.5Q108 -518 108 -761Q108 -998 200.0 -1177.0Q292 -1356 459.5 -1456.0Q627 -1556 853 -1556Q1005 -1556 1136.5 -1507.5Q1268 -1459 1366.5 -1362.0Q1465 -1265 1520.0 -1118.5Q1575 -972 1575 -776V-659H278V-923H1174Q1174 -1015 1134.0 -1086.0Q1094 -1157 1023.5 -1197.5Q953 -1238 860 -1238Q763 -1238 688.5 -1193.5Q614 -1149 572.0 -1074.5Q530 -1000 529 -909V-658Q529 -544 571.5 -461.0Q614 -378 692.0 -333.0Q770 -288 877 -288Q948 -288 1007.0 -308.0Q1066 -328 1108.0 -368.0Q1150 -408 1172 -466L1566 -440Q1536 -298 1443.5 -192.5Q1351 -87 1205.5 -28.5Q1060 30 870 30Z"/>
+<path class="ltr" style="--t:639ms;--tx:translate(1584px,0);transform:var(--tx)" d="M1602 -1536 1065 0H585L48 -1536H498L817 -437H833L1151 -1536Z"/>
+<path class="ltr" style="--t:821ms;--tx:translate(3136px,0);transform:var(--tx)" d="M608 29Q461 29 346.0 -22.5Q231 -74 164.5 -175.5Q98 -277 98 -429Q98 -557 145.0 -644.0Q192 -731 273.0 -784.0Q354 -837 457.5 -864.0Q561 -891 675 -902Q809 -916 891.0 -928.5Q973 -941 1010.0 -966.0Q1047 -991 1047 -1040V-1046Q1047 -1141 987.5 -1193.0Q928 -1245 819 -1245Q704 -1245 636.0 -1194.5Q568 -1144 546 -1068L152 -1100Q182 -1240 270.0 -1342.5Q358 -1445 497.5 -1500.5Q637 -1556 821 -1556Q949 -1556 1066.5 -1526.0Q1184 -1496 1275.5 -1433.0Q1367 -1370 1420.0 -1271.5Q1473 -1173 1473 -1036V0H1069V-213H1057Q1020 -141 958.0 -86.5Q896 -32 809.0 -1.5Q722 29 608 29ZM730 -265Q824 -265 896.0 -302.5Q968 -340 1009.0 -404.0Q1050 -468 1050 -549V-712Q1030 -699 995.5 -688.5Q961 -678 918.0 -669.5Q875 -661 832.0 -654.5Q789 -648 754 -643Q679 -632 623.0 -608.0Q567 -584 536.0 -543.5Q505 -503 505 -443Q505 -356 568.5 -310.5Q632 -265 730 -265Z"/>
+<path class="ltr" style="--t:1003ms;--tx:translate(4671px,0);transform:var(--tx)" d="M864 30Q628 30 458.5 -70.5Q289 -171 198.5 -350.0Q108 -529 108 -762Q108 -998 199.5 -1176.5Q291 -1355 460.0 -1455.5Q629 -1556 862 -1556Q1063 -1556 1214.0 -1483.0Q1365 -1410 1453.0 -1278.0Q1541 -1146 1550 -968H1148Q1131 -1083 1058.5 -1153.5Q986 -1224 869 -1224Q770 -1224 696.5 -1170.5Q623 -1117 582.0 -1015.0Q541 -913 541 -768Q541 -621 581.5 -518.0Q622 -415 696.0 -361.0Q770 -307 869 -307Q942 -307 1000.5 -337.0Q1059 -367 1097.5 -424.5Q1136 -482 1148 -563H1550Q1540 -387 1454.5 -253.5Q1369 -120 1219.0 -45.0Q1069 30 864 30Z"/>
+<path class="ltr" style="--t:1154ms;--tx:translate(6227px,0);transform:var(--tx)" d="M987 -1536V-1216H62V-1536ZM272 -1904H698V-472Q698 -413 716.0 -380.5Q734 -348 766.5 -335.0Q799 -322 842 -322Q872 -322 902.0 -327.5Q932 -333 948 -336L1015 -19Q983 -9 925.0 4.5Q867 18 784 21Q630 27 514.5 -20.0Q399 -67 335.0 -166.0Q271 -265 272 -416Z"/>
+<path class="ltr" style="--t:1252ms;--tx:translate(7222px,0);transform:var(--tx)" d="M170 0V-1536H596V0ZM384 -1734Q289 -1734 221.5 -1797.5Q154 -1861 154 -1950Q154 -2038 221.5 -2101.5Q289 -2165 384 -2165Q479 -2165 546.5 -2101.5Q614 -2038 614 -1950Q614 -1861 546.5 -1797.5Q479 -1734 384 -1734Z"/>
+  </g>
+  <g class="grid">
+<rect class="ghost" style="--d:0ms" x="8136" y="-1536" width="355" height="355" rx="14"/>
+<rect class="cell k" style="--t:1335ms" x="8136" y="-1536" width="355" height="355" rx="14"/>
+<rect class="ghost" style="--d:45ms" x="8530" y="-1536" width="355" height="355" rx="14"/>
+<rect class="cell k" style="--t:1382ms" x="8530" y="-1536" width="355" height="355" rx="14"/>
+<rect class="ghost" style="--d:90ms" x="8924" y="-1536" width="355" height="355" rx="14"/>
+<rect class="ghost" style="--d:135ms" x="9317" y="-1536" width="355" height="355" rx="14"/>
+<rect class="ghost" style="--d:45ms" x="8136" y="-1142" width="355" height="355" rx="14"/>
+<rect class="cell k" style="--t:1335ms" x="8136" y="-1142" width="355" height="355" rx="14"/>
+<rect class="ghost" style="--d:90ms" x="8530" y="-1142" width="355" height="355" rx="14"/>
+<rect class="cell o" style="--t:1382ms" x="8530" y="-1142" width="355" height="355" rx="14"/>
+<rect class="ghost" style="--d:135ms" x="8924" y="-1142" width="355" height="355" rx="14"/>
+<rect class="ghost" style="--d:180ms" x="9317" y="-1142" width="355" height="355" rx="14"/>
+<rect class="ghost" style="--d:90ms" x="8136" y="-749" width="355" height="355" rx="14"/>
+<rect class="ghost" style="--d:135ms" x="8530" y="-749" width="355" height="355" rx="14"/>
+<rect class="ghost" style="--d:180ms" x="8924" y="-749" width="355" height="355" rx="14"/>
+<rect class="cell o" style="--t:1428ms" x="8924" y="-749" width="355" height="355" rx="14"/>
+<rect class="ghost" style="--d:225ms" x="9317" y="-749" width="355" height="355" rx="14"/>
+<rect class="cell k" style="--t:1474ms" x="9317" y="-749" width="355" height="355" rx="14"/>
+<rect class="ghost" style="--d:135ms" x="8136" y="-355" width="355" height="355" rx="14"/>
+<rect class="ghost" style="--d:180ms" x="8530" y="-355" width="355" height="355" rx="14"/>
+<rect class="ghost" style="--d:225ms" x="8924" y="-355" width="355" height="355" rx="14"/>
+<rect class="cell k" style="--t:1428ms" x="8924" y="-355" width="355" height="355" rx="14"/>
+<rect class="ghost" style="--d:270ms" x="9317" y="-355" width="355" height="355" rx="14"/>
+<rect class="cell k" style="--t:1474ms" x="9317" y="-355" width="355" height="355" rx="14"/>
+  </g>
+  <g mask="url(#beamMask)">
+    <g class="scan"><rect x="-900" y="-2150" width="900" height="2230" fill="url(#beam)"/><rect x="-14" y="-2150" width="14" height="2230" fill="#ff8a45"/></g>
+    <g class="scan2"><rect x="-500" y="-1656" width="500" height="1776" fill="url(#beam)"/><rect x="-12" y="-1656" width="12" height="1776" fill="#ff8a45"/></g>
+  </g>
+</svg>
+<a class="enter" href="/login">Вход</a>
+</body>
+</html>
