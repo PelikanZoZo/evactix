@@ -1,0 +1,73 @@
+name: Проверка сервера
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/check-server.yml
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Секреты заданы?
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          missing=0
+          for n in DEPLOY_HOST DEPLOY_USER DEPLOY_PASSWORD DATABASE_URL; do
+            if [ -n "${!n}" ]; then echo "OK      $n"; else echo "НЕТ     $n"; missing=1; fi
+          done
+          if [ -n "$DATABASE_URL" ]; then
+            python3 - <<'PY'
+          import os, urllib.parse as u
+          p = u.urlparse(os.environ["DATABASE_URL"])
+          ok = p.scheme in ("mysql", "mysql2") and p.username and p.password is not None and p.hostname and p.path.strip("/")
+          print("Формат DATABASE_URL:", "OK" if ok else "ОШИБКА (ожидается mysql://user:pass@host:port/db)")
+          if ok:
+              print("  хост:", p.hostname, " порт:", p.port or 3306, " база:", p.path.strip("/"), " пользователь задан")
+          PY
+          fi
+          exit $missing
+
+      - name: Вход по SSH и окружение
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          SSHPASS: ${{ secrets.DEPLOY_PASSWORD }}
+        run: |
+          sudo apt-get install -y -qq sshpass >/dev/null
+          sshpass -e ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$DEPLOY_USER@$DEPLOY_HOST" '
+            echo "SSH: OK"; echo "Домашняя папка: $HOME"
+            echo "--- Содержимое:"; ls -la ~ | head -40
+            echo "--- Node.js:"; (node -v 2>/dev/null || ls -d /opt/*node* /usr/local/bin/node* 2>/dev/null || echo "node не найден в PATH")
+            echo "--- npm:"; (npm -v 2>/dev/null || echo "npm не найден в PATH")
+            echo "--- MySQL-клиент:"; (mysql --version 2>/dev/null || echo "mysql не найден")
+          '
+
+      - name: Подключение к базе (с сервера)
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          SSHPASS: ${{ secrets.DEPLOY_PASSWORD }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python3 - > my.cnf <<'PY'
+          import os, urllib.parse as u
+          p = u.urlparse(os.environ["DATABASE_URL"])
+          print("[client]")
+          print("user=" + u.unquote(p.username))
+          print("password=" + u.unquote(p.password or ""))
+          print("host=" + p.hostname)
+          print("port=" + str(p.port or 3306))
+          print("database=" + p.path.strip("/"))
+          PY
+          sshpass -e ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$DEPLOY_USER@$DEPLOY_HOST" '
+            f=$(mktemp); cat > "$f"; chmod 600 "$f"
+            mysql --defaults-extra-file="$f" -e "SELECT VERSION() AS mysql_version, DATABASE() AS db;" && echo "БАЗА: OK" || echo "БАЗА: ОШИБКА подключения"
+            rm -f "$f"
+          ' < my.cnf
+          rm -f my.cnf
