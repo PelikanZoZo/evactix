@@ -59,6 +59,9 @@ jobs:
             echo "--- Node.js:"; (node -v 2>/dev/null || ls -d /opt/*node* /usr/local/bin/node* 2>/dev/null || echo "node не найден в PATH")
             echo "--- npm:"; (npm -v 2>/dev/null || echo "npm не найден в PATH")
             echo "--- MySQL-клиент:"; (mysql --version 2>/dev/null || echo "mysql не найден")
+            echo "--- .nvmrc:"; cat ~/.nvmrc 2>/dev/null
+            for d in evactix.ru evactix.com; do echo "--- ~/$d:"; ls -la ~/$d 2>/dev/null; for sub in ~/$d/*; do [ -d "$sub" ] && { echo "  $sub:"; ls -la "$sub" | head -15; }; done; done
+            echo "--- где Node.js:"; ls -d /opt/node* /opt/nodejs* /usr/local/node* /opt/alt/*node* 2>/dev/null | head; ls /usr/bin | grep -i -E "^node|^unit" | head; (bash -lc "node -v" 2>/dev/null || true)
           '
 
       - name: Подключение к базе (с сервера)
