@@ -88,14 +88,15 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_API_BASE: ${{ secrets.TELEGRAM_API_BASE }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
           tar czf conductor.tgz --exclude='__pycache__' --exclude='*.egg-info' --exclude='.pytest_cache' --exclude='tests' -C conductor .
           rsh -p "$P" "$U@$H" 'rm -rf /tmp/evactix-conductor && mkdir -p /tmp/evactix-conductor && tar xzf - -C /tmp/evactix-conductor' < conductor.tgz
           # Секреты идут через stdin; ключ к базе ядра копируется на сервере и в логи не попадает
           REL=$(python3 -c "import tomllib;print(tomllib.load(open('conductor/pyproject.toml','rb'))['project']['version'])")
-          printf 'TELEGRAM_BOT_TOKEN=%s\nTELEGRAM_CHAT_ID=%s\nDEEPSEEK_API_KEY=%s\nCONDUCTOR_RELEASE=%s\nCONDUCTOR_COMMIT=%s\n' \
-            "$TELEGRAM_BOT_TOKEN" "$TELEGRAM_CHAT_ID" "$DEEPSEEK_API_KEY" "$REL" "$GITHUB_SHA" \
+          printf 'TELEGRAM_BOT_TOKEN=%s\nTELEGRAM_CHAT_ID=%s\nTELEGRAM_API_BASE=%s\nDEEPSEEK_API_KEY=%s\nCONDUCTOR_RELEASE=%s\nCONDUCTOR_COMMIT=%s\n' \
+            "$TELEGRAM_BOT_TOKEN" "$TELEGRAM_CHAT_ID" "$TELEGRAM_API_BASE" "$DEEPSEEK_API_KEY" "$REL" "$GITHUB_SHA" \
           | rsh -p "$P" "$U@$H" 'if [ "$(id -u)" = 0 ]; then bash /tmp/evactix-conductor/install.sh; else sudo -n bash /tmp/evactix-conductor/install.sh; fi'
 
       - name: Сборка и запуск
@@ -111,7 +112,9 @@ jobs:
           echo "==> Журнал Дирижёра"
           $D logs --tail 30 conductor
           echo "==> Связь с сервера"
-          curl -s -o /dev/null -m 10 -w 'api.telegram.org: %{http_code}\n' https://api.telegram.org/ || echo "api.telegram.org: нет ответа"
+          curl -s -o /dev/null -m 10 -w 'api.telegram.org напрямую: %{http_code}\n' https://api.telegram.org/ || echo "api.telegram.org напрямую: нет ответа"
+          B=$(grep '^TELEGRAM_API_BASE=' .env | cut -d= -f2-)
+          if [ -n "$B" ]; then curl -s -o /dev/null -m 15 -w 'Telegram через переходник: %{http_code} (404 у корня — это норма)\n' "${B%/*}/" || echo "переходник: нет ответа"; else echo "переходник не задан (секрет TELEGRAM_API_BASE)"; fi
           curl -s -o /dev/null -m 10 -w 'api.deepseek.com: %{http_code}\n' https://api.deepseek.com/ || echo "api.deepseek.com: нет ответа"
           echo "==> Задания"
           docker exec evactix-db-1 psql -U evactix -d evactix -P pager=off -c "select id, title, exec_status, to_char(next_run_at at time zone 'Europe/Moscow','DD.MM HH24:MI') as next_msk from jobs.jobs order by id" </dev/null

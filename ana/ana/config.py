@@ -17,6 +17,8 @@ class Settings:
     disk_crit_pct: float = field(default_factory=lambda: float(os.getenv("DISK_CRIT_PCT", "85")))
     telegram_token: str = field(default_factory=lambda: os.getenv("TELEGRAM_BOT_TOKEN", ""))
     telegram_chat: str = field(default_factory=lambda: os.getenv("TELEGRAM_CHAT_ID", ""))
+    # Сервер не достаёт до api.telegram.org — ходим через переходник на Cloudflare (infra/telegram-relay)
+    telegram_api: str = field(default_factory=lambda: os.getenv("TELEGRAM_API_BASE", "") or "https://api.telegram.org")
     check_every: int = field(default_factory=lambda: int(os.getenv("CHECK_EVERY", "300")))
     digest_hour_msk: int = field(default_factory=lambda: int(os.getenv("DIGEST_HOUR_MSK", "9")))
     commit: str = field(default_factory=lambda: os.getenv("ANA_COMMIT", "dev")[:7])

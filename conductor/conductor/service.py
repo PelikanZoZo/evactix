@@ -168,7 +168,7 @@ class TelegramPoller:
         r = conn.execute("select (value->>'offset')::bigint from jobs.kv where key='tg_offset'").fetchone()
         offset = r[0] if r and r[0] else 0
         try:
-            resp = self.http.get(f"https://api.telegram.org/bot{self.s.telegram_token}/getUpdates",
+            resp = self.http.get(f"{self.s.telegram_api}/bot{self.s.telegram_token}/getUpdates",
                                  params={"offset": offset, "timeout": timeout, "allowed_updates": '["message"]'})
         except httpx.HTTPError as e:
             log.warning("Telegram недоступен: %s", type(e).__name__)
@@ -244,12 +244,12 @@ def main() -> int:
             outbox.enqueue(conn, f"🎼 Дирижёр v{__version__} ({s.commit}) на связи. Задания, расписания и разговор словами"
                                  f"{'' if llm.enabled else ' (без DeepSeek)'}. Напиши, что напомнить или за чем следить.", [owner])
     log.info("Дирижёр v%s: миграции %s, системных заданий создано %d", __version__, applied or "—", len(made))
-    sender = outbox.Sender(s.telegram_token)
+    sender = outbox.Sender(s.telegram_token, api_base=s.telegram_api)
     threads = [threading.Thread(target=_loop, args=("планировщик", s, lambda c: scheduler_tick(c, llm), s.tick_seconds), daemon=True),
                threading.Thread(target=_loop, args=("отправщик", s, lambda c: sender.send_pending(c), 3), daemon=True)]
     if s.poll_telegram and s.telegram_token:
         poller = TelegramPoller(s, llm)
-        threads.append(threading.Thread(target=_loop, args=("telegram", s, lambda c: poller.poll_once(c), 1), daemon=True))
+        threads.append(threading.Thread(target=_loop, args=("telegram", s, lambda c: poller.poll_once(c, timeout=20), 1), daemon=True))
     for t in threads:
         t.start()
     while not _stop.is_set():

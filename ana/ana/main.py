@@ -33,7 +33,7 @@ def _on_signal(*_):
 class Ana:
     def __init__(self, s: Settings, tg: Telegram | None = None, state: State | None = None):
         self.s = s
-        self.tg = tg or Telegram(s.telegram_token, s.telegram_chat)
+        self.tg = tg or Telegram(s.telegram_token, s.telegram_chat, s.telegram_api)
         os.makedirs(os.path.dirname(s.state_path) or ".", exist_ok=True)
         self.state = state or State(s.state_path)
 

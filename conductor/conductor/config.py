@@ -22,6 +22,8 @@ class Settings:
     db_password: str = field(default_factory=lambda: _env("CORE_DB_PASSWORD"))
     telegram_token: str = field(default_factory=lambda: _env("TELEGRAM_BOT_TOKEN"))
     owner_chat: str = field(default_factory=lambda: _env("TELEGRAM_CHAT_ID"))
+    # Сервер не достаёт до api.telegram.org — ходим через переходник на Cloudflare (infra/telegram-relay)
+    telegram_api: str = field(default_factory=lambda: (_env("TELEGRAM_API_BASE") or "https://api.telegram.org").rstrip("/"))
     allowed_chats: str = field(default_factory=lambda: _env("TELEGRAM_ALLOWED"))
     deepseek_key: str = field(default_factory=lambda: _env("DEEPSEEK_API_KEY"))
     deepseek_model: str = field(default_factory=lambda: _env("DEEPSEEK_MODEL", "deepseek-chat"))

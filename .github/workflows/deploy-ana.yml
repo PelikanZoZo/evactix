@@ -88,12 +88,13 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_API_BASE: ${{ secrets.TELEGRAM_API_BASE }}
         run: |
           tar czf ana.tgz --exclude='__pycache__' --exclude='*.egg-info' --exclude='.pytest_cache' -C ana .
           rsh -p "$P" "$U@$H" 'rm -rf /tmp/evactix-ana && mkdir -p /tmp/evactix-ana && tar xzf - -C /tmp/evactix-ana' < ana.tgz
           # Секреты идут через stdin; ключ к базе ядра копируется на сервере и в логи не попадает
           REL=$(python3 -c "import tomllib;print(tomllib.load(open('ana/pyproject.toml','rb'))['project']['version'])")
-          printf 'TELEGRAM_BOT_TOKEN=%s\nTELEGRAM_CHAT_ID=%s\nANA_RELEASE=%s\nANA_COMMIT=%s\n' "$TELEGRAM_BOT_TOKEN" "$TELEGRAM_CHAT_ID" "$REL" "$GITHUB_SHA" \
+          printf 'TELEGRAM_BOT_TOKEN=%s\nTELEGRAM_CHAT_ID=%s\nTELEGRAM_API_BASE=%s\nANA_RELEASE=%s\nANA_COMMIT=%s\n' "$TELEGRAM_BOT_TOKEN" "$TELEGRAM_CHAT_ID" "$TELEGRAM_API_BASE" "$REL" "$GITHUB_SHA" \
           | rsh -p "$P" "$U@$H" 'if [ "$(id -u)" = 0 ]; then bash /tmp/evactix-ana/install.sh; else sudo -n bash /tmp/evactix-ana/install.sh; fi'
 
       - name: Сборка и запуск
@@ -109,6 +110,8 @@ jobs:
           echo "==> Журнал Аны"
           $D logs --tail 20 ana
           echo "==> Telegram с сервера"
-          curl -s -o /dev/null -m 10 -w 'api.telegram.org: %{http_code}\n' https://api.telegram.org/ || echo "api.telegram.org: нет ответа"
+          curl -s -o /dev/null -m 10 -w 'api.telegram.org напрямую: %{http_code}\n' https://api.telegram.org/ || echo "api.telegram.org напрямую: нет ответа"
+          B=$(grep '^TELEGRAM_API_BASE=' .env | cut -d= -f2-)
+          if [ -n "$B" ]; then curl -s -o /dev/null -m 15 -w 'Telegram через переходник: %{http_code} (404 у корня — это норма)\n' "${B%/*}/" || echo "переходник: нет ответа"; else echo "переходник не задан (секрет TELEGRAM_API_BASE)"; fi
           rm -rf /tmp/evactix-ana
           REMOTE

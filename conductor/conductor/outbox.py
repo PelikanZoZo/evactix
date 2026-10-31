@@ -36,8 +36,9 @@ def sign(secret: str, ts: str, body: bytes) -> str:
 
 
 class Sender:
-    def __init__(self, tg_token: str, http: httpx.Client | None = None):
+    def __init__(self, tg_token: str, http: httpx.Client | None = None, api_base: str = "https://api.telegram.org"):
         self.tg_token = tg_token
+        self.api_base = (api_base or "https://api.telegram.org").rstrip("/")
         self.http = http or httpx.Client(timeout=20)
 
     def _telegram(self, chat_id: str, text: str) -> None:
@@ -45,7 +46,7 @@ class Sender:
             raise RuntimeError("Telegram не настроен")
         for i in range(0, len(text), TG_LIMIT):
             try:
-                r = self.http.post(f"https://api.telegram.org/bot{self.tg_token}/sendMessage",
+                r = self.http.post(f"{self.api_base}/bot{self.tg_token}/sendMessage",
                                    json={"chat_id": chat_id, "text": text[i:i + TG_LIMIT],
                                          "disable_web_page_preview": True})
             except httpx.HTTPError as e:
