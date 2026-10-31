@@ -1,10 +1,32 @@
-# Сервисы Evactix на VPS-1. Настроено под небольшой сервер (2 ГБ RAM).
+# Сервисы Evactix v1 на VPS-1. Настроено под небольшой сервер (2 ГБ RAM).
 name: evactix
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-core: &core
+  image: evactix-core:${EVACTIX_RELEASE:-dev}
+  build:
+    context: ./core
+  restart: unless-stopped
+  logging: *logging
+  depends_on:
+    db:
+      condition: service_healthy
+  environment: &core-env
+    DB_HOST: db
+    DB_NAME: evactix
+    RAW_DIR: /data/raw
+    EVACTIX_COMMIT: ${EVACTIX_COMMIT:-dev}
 
 services:
   db:
     image: timescale/timescaledb:2.17.2-pg16
     restart: unless-stopped
+    logging: *logging
     environment:
       POSTGRES_USER: evactix
       POSTGRES_DB: evactix
@@ -26,6 +48,8 @@ services:
       - timezone=UTC
       - -c
       - shared_preload_libraries=timescaledb
+      - -c
+      - timescaledb.telemetry_level=off
     volumes:
       - dbdata:/var/lib/postgresql/data
     # Порт наружу не публикуется: база видна только внутри сети Docker (принцип № 20)
@@ -39,6 +63,7 @@ services:
   edge:
     image: caddy:2.8.4-alpine
     restart: unless-stopped
+    logging: *logging
     ports:
       - "80:80"
       - "443:443"
@@ -47,6 +72,37 @@ services:
       - caddydata:/data
     mem_limit: 128m
 
+  # Миграции и справочники: запускается при выкатке (docker compose run --rm migrate)
+  migrate:
+    <<: *core
+    restart: "no"
+    profiles: ["tools"]
+    command: ["python", "-m", "evactix.migrate"]
+    environment:
+      <<: *core-env
+      DB_USER: evactix
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      COLLECTOR_DB_PASSWORD: ${COLLECTOR_DB_PASSWORD:?нужен COLLECTOR_DB_PASSWORD}
+      ANA_DB_PASSWORD: ${ANA_DB_PASSWORD:?нужен ANA_DB_PASSWORD}
+
+  # Сборщики: только дописывают события и планы, свои ключи к базе
+  collector:
+    <<: *core
+    command: ["python", "-m", "evactix.runner"]
+    environment:
+      <<: *core-env
+      DB_USER: collector
+      DB_PASSWORD: ${COLLECTOR_DB_PASSWORD:?нужен COLLECTOR_DB_PASSWORD}
+    volumes:
+      - rawdata:/data/raw
+    mem_limit: 256m
+
 volumes:
   dbdata:
   caddydata:
+  rawdata:
+
+# Сеть ядра с постоянным именем: к ней подключается отдельный проект Аны (evactix-ana)
+networks:
+  default:
+    name: evactix-core

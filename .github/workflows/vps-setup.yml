@@ -110,8 +110,8 @@ jobs:
           rsh -p "$P" -o ServerAliveInterval=15 "$U@$H" "$S" <<'REMOTE'
           set -e
           cd /opt/evactix
-          sudo -u deploy docker compose pull -q
-          sudo -u deploy docker compose up -d
+          sudo -u deploy docker compose pull -q db edge
+          sudo -u deploy docker compose up -d db edge
           for i in $(seq 1 30); do
             st=$(docker inspect -f '{{.State.Health.Status}}' evactix-db-1 2>/dev/null || echo none)
             [ "$st" = healthy ] && break; sleep 3

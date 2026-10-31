@@ -1,0 +1,28 @@
+[project]
+name = "evactix-core"
+version = "1.0.0"
+description = "Evactix: ядро — хранилище событий и планов, сборщики, сторож Ана"
+requires-python = ">=3.12"
+dependencies = [
+    "psycopg[binary]==3.2.3",
+    "pydantic==2.9.2",
+    "httpx==0.27.2",
+    "astral==3.2",
+    "h3==4.1.2",
+]
+
+[project.optional-dependencies]
+test = ["pytest==8.3.3"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["evactix*"]
+
+[tool.setuptools.package-data]
+"evactix.migrations" = ["*.sql"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
