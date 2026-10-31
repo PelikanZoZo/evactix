@@ -288,3 +288,14 @@ def test_persona_same_as_ana():
     assert grab("conductor/conductor/persona.py") == grab("ana/ana/persona.py")
     from conductor.agent import CHAT_SYSTEM
     assert "Ты — Ана" in CHAT_SYSTEM and "{who}" in CHAT_SYSTEM
+
+
+def test_failed_collect_retried(conn, settings, make_llm):
+    service.ensure_system_jobs(conn)
+    jid = conn.execute("select id from jobs.jobs where system_key='collect:noaa.gfs'").fetchone()[0]
+    conn.execute("update jobs.jobs set next_run_at = now() + interval '3 hours', last_run_at = now() where id=%s", (jid,))
+    conn.execute("""insert into jobs.commands (target, name, job_id, status, finished_at)
+                    values ('collector', 'noaa.gfs', %s, 'failed', now() - interval '20 minutes')""", (jid,))
+    assert service.retry_failed_collects(conn) == 1
+    assert conn.execute("select next_run_at <= now() from jobs.jobs where id=%s", (jid,)).fetchone()[0]
+    assert service.retry_failed_collects(conn) == 0
