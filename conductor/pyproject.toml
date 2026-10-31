@@ -1,6 +1,6 @@
 [project]
 name = "evactix-conductor"
-version = "1.1.1"
+version = "1.1.2"
 description = "Дирижёр Evactix: задания, расписания, отправка, агент, разговор в Telegram"
 requires-python = ">=3.12"
 dependencies = [
