@@ -51,12 +51,17 @@ if [ -f /root/.ssh/authorized_keys ]; then
   install -m 600 -o deploy -g deploy /root/.ssh/authorized_keys /home/deploy/.ssh/authorized_keys
 fi
 
-log "SSH: только ключи"
-cat > /etc/ssh/sshd_config.d/10-evactix.conf <<'CONF'
+if [ "${KEEP_PASSWORD:-0}" = 1 ]; then
+  log "SSH: вход по паролю оставлен (временный сервер; защищает fail2ban)"
+  rm -f /etc/ssh/sshd_config.d/10-evactix.conf
+else
+  log "SSH: только ключи"
+  cat > /etc/ssh/sshd_config.d/10-evactix.conf <<'CONF'
 PasswordAuthentication no
 KbdInteractiveAuthentication no
 PermitRootLogin prohibit-password
 CONF
+fi
 sshd -t && systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || true
 
 log "Брандмауэр: открыты только 22, 80, 443"
