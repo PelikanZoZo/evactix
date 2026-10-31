@@ -104,7 +104,7 @@ jobs:
           cd /opt/evactix-ana
           D="sudo -u deploy docker compose"
           $D build -q ana
-          $D up -d --remove-orphans ana
+          $D up -d --force-recreate --remove-orphans ana
           sleep 20
           $D ps
           echo "==> Журнал Аны"
