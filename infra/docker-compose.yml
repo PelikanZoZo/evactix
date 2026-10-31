@@ -1,0 +1,52 @@
+# Сервисы Evactix на VPS-1. Настроено под небольшой сервер (2 ГБ RAM).
+name: evactix
+
+services:
+  db:
+    image: timescale/timescaledb:2.17.2-pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: evactix
+      POSTGRES_DB: evactix
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?нужен POSTGRES_PASSWORD}
+      TIMESCALEDB_TELEMETRY: "off"
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=768MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=64MB
+      - -c
+      - max_connections=40
+      - -c
+      - timezone=UTC
+      - -c
+      - shared_preload_libraries=timescaledb
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    # Порт наружу не публикуется: база видна только внутри сети Docker (принцип № 20)
+    mem_limit: 800m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evactix -d evactix"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  edge:
+    image: caddy:2.8.4-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+    mem_limit: 128m
+
+volumes:
+  dbdata:
+  caddydata:
