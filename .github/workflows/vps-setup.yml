@@ -33,6 +33,7 @@ jobs:
           exit $missing
 
       - name: Подключение по SSH
+        shell: bash
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
@@ -41,7 +42,25 @@ jobs:
         run: |
           H="$(echo -n "$VPS_HOST" | tr -d '[:space:]')"; P="$(echo -n "$VPS_PORT" | tr -d '[:space:]')"
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
-          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          # Ключ мог исказиться при копировании из веб-консоли: пересобираем его из «тела» без пробелов и переносов
+          printf '%s' "$VPS_SSH_KEY" | python3 -c '
+          import sys, re, base64
+          t = sys.stdin.read()
+          m = re.search(r"-----BEGIN OPENSSH PRIVATE KEY-----(.*?)-----END OPENSSH PRIVATE KEY-----", t, re.S)
+          if not m:
+              sys.exit("Ключ: нет строк BEGIN/END")
+          body = re.sub(r"[^A-Za-z0-9+/=]", "", m.group(1))
+          try:
+              raw = base64.b64decode(body, validate=True)
+          except Exception as e:
+              sys.exit("Ключ: тело повреждено (%d символов): %s" % (len(body), e))
+          print("Ключ: тело %d символов, заголовок %s" % (len(body), "верный" if raw.startswith(b"openssh-key-v1\0") else "НЕВЕРНЫЙ"), file=sys.stderr)
+          lines = [body[i:i+70] for i in range(0, len(body), 70)]
+          open(sys.argv[1], "w").write("-----BEGIN OPENSSH PRIVATE KEY-----\n" + "\n".join(lines) + "\n-----END OPENSSH PRIVATE KEY-----\n")
+          ' ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "Отпечаток ключа из секрета (сверить с сервером: ssh-keygen -lf /root/.ssh/authorized_keys):"
+          ssh-keygen -lf <(ssh-keygen -y -f ~/.ssh/id_ed25519) || { echo "Ключ не читается — скопирован с ошибкой"; exit 1; }
           if [ -n "$VPS_KNOWN_HOSTS" ]; then
             printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
           else
