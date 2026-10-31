@@ -65,3 +65,7 @@ ec | Санкции ООН | https://scsanctions.un.org/resources/xml/en/consoli
 ec | Binance | https://api.binance.com/api/v3/ping
 ec | TCMB EVDS | https://evds2.tcmb.gov.tr/
 ec | Казахстан data.egov | https://data.egov.kz/
+
+# --- Каналы и ИИ
+ch | Telegram Bot API | https://api.telegram.org/
+ch | DeepSeek API | https://api.deepseek.com/

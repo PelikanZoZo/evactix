@@ -1,0 +1,33 @@
+# Дирижёр — отдельный сервис рядом с ядром Evactix v1: задания, отправка, разговор в Telegram.
+# К ядру подключается через его сеть evactix-core, ключом conductor (данные ядра — только чтение, своя схема jobs).
+name: evactix-conductor
+
+services:
+  conductor:
+    image: evactix-conductor:${CONDUCTOR_RELEASE:-dev}
+    build:
+      context: .
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      CORE_DB_HOST: db
+      CORE_DB_NAME: evactix
+      CORE_DB_USER: conductor
+      CORE_DB_PASSWORD: ${CORE_DB_PASSWORD:?нужен CORE_DB_PASSWORD}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      TELEGRAM_API_BASE: ${TELEGRAM_API_BASE:-}
+      TELEGRAM_ALLOWED: ${TELEGRAM_ALLOWED:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      CONDUCTOR_COMMIT: ${CONDUCTOR_COMMIT:-dev}
+    networks: [core]
+    mem_limit: 256m
+
+networks:
+  core:
+    name: evactix-core
+    external: true

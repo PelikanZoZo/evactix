@@ -1,0 +1,25 @@
+[project]
+name = "evactix-conductor"
+version = "1.0.0"
+description = "Дирижёр Evactix: задания, расписания, отправка, агент, разговор в Telegram"
+requires-python = ">=3.12"
+dependencies = [
+    "psycopg[binary]==3.2.3",
+    "httpx==0.27.2",
+]
+
+[project.optional-dependencies]
+test = ["pytest==8.3.3"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["conductor*"]
+
+[tool.setuptools.package-data]
+"conductor.migrations" = ["*.sql"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

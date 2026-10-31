@@ -51,6 +51,31 @@ def run_once(conn: psycopg.Connection, col) -> Counts:
         raise
 
 
+CONDUCTOR_FRESH = 600   # секунд: пульс Дирижёра свежее — работаем по его командам
+
+
+def conductor_alive(conn) -> bool:
+    """Есть ли живой Дирижёр. Нет схемы, прав или пульс старый — сборщики работают по своему расписанию."""
+    try:
+        r = conn.execute("select extract(epoch from now() - at) from jobs.heartbeat where id=1").fetchone()
+    except (psycopg.errors.UndefinedTable, psycopg.errors.InvalidSchemaName, psycopg.errors.InsufficientPrivilege):
+        return False
+    return bool(r) and r[0] is not None and r[0] < CONDUCTOR_FRESH
+
+
+def take_command(conn):
+    with conn.transaction():
+        return conn.execute("""update jobs.commands set status='running', taken_at=now()
+                               where id = (select id from jobs.commands where target='collector' and status='pending'
+                                           order by created_at limit 1 for update skip locked)
+                               returning id, name""").fetchone()
+
+
+def finish_command(conn, cmd_id: int, ok: bool, result: str) -> None:
+    conn.execute("update jobs.commands set status=%s, finished_at=now(), result=%s where id=%s",
+                 ("done" if ok else "failed", result[:500], cmd_id))
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     signal.signal(signal.SIGTERM, _on_signal)
@@ -68,6 +93,24 @@ def main() -> int:
         try:
             if conn is None or conn.closed:
                 conn = psycopg.connect(s.dsn(), autocommit=True)
+            if conductor_alive(conn):
+                # Режим по командам: когда собирать, решает Дирижёр (системные задания «Сбор: …»)
+                by_name = {c.name: c for c in collectors}
+                while not _stop and (cmd := take_command(conn)):
+                    cmd_id, name = cmd
+                    c = by_name.get(name)
+                    if c is None:
+                        finish_command(conn, cmd_id, False, f"сборщика {name} нет")
+                        continue
+                    try:
+                        cnt = run_once(conn, c)
+                        finish_command(conn, cmd_id, True, f"записано {cnt.written}, без изменений {cnt.skipped}, отклонено {cnt.rejected}")
+                        log.info("%s (команда %s): записано %d", name, cmd_id, cnt.written)
+                    except Exception as e:
+                        finish_command(conn, cmd_id, False, f"{type(e).__name__}: {e}")
+                    due[name] = time.monotonic() + c.interval.total_seconds()
+                time.sleep(5)
+                continue
             for c in collectors:
                 if _stop or time.monotonic() < due[c.name]:
                     continue

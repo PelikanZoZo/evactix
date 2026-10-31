@@ -26,7 +26,8 @@ def migrate(conn: psycopg.Connection) -> list[str]:
 
 def set_role_passwords(conn: psycopg.Connection) -> list[str]:
     changed = []
-    for role, env in (("collector", "COLLECTOR_DB_PASSWORD"), ("ana", "ANA_DB_PASSWORD")):
+    for role, env in (("collector", "COLLECTOR_DB_PASSWORD"), ("ana", "ANA_DB_PASSWORD"),
+                      ("conductor", "CONDUCTOR_DB_PASSWORD")):
         pw = os.getenv(env, "")
         if pw:
             conn.execute(sql.SQL("alter role {} with login password {}").format(sql.Identifier(role), sql.Literal(pw)))
