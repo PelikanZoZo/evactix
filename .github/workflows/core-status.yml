@@ -40,6 +40,9 @@ jobs:
           Q -c "select collector, status, written, skipped, rejected, to_char(started_at,'DD HH24:MI') as started, round(extract(epoch from finished_at-started_at))::int as sec, left(coalesce(error,''),90) as error from collector_runs order by id desc limit 25" </dev/null
           Q -c "select source_id, count(*) as events, max(observed_at) as last_issue, max(occurred_at) as to_time from events where recorded_at > now() - interval '2 days' group by 1 order by 1" </dev/null
           Q -c "select to_char(occurred_at,'DD HH24:MI') as at, metric, value->>'v' as v, round(confidence::numeric,2) as conf, payload from events e where source_id='weather.consensus' and subject->0->>'id'='point:moscow' and occurred_at between now() and now()+interval '12 hours' and recorded_at=(select max(recorded_at) from events x where x.dedup_key=e.dedup_key) order by occurred_at, metric limit 40" </dev/null
+          Q -c "select id, name, status, to_char(created_at,'HH24:MI:SS') c, to_char(taken_at,'HH24:MI:SS') t, to_char(finished_at,'HH24:MI:SS') f, left(coalesce(result,''),80) r from jobs.commands order by id desc limit 15" </dev/null
+          Q -c "select system_key, status, exec_status, run_count, to_char(next_run_at,'DD HH24:MI') nxt, to_char(last_run_at,'DD HH24:MI') last from jobs.jobs where system_key like 'collect:%' order by system_key" </dev/null
+          echo "--- журнал сборщиков"; (sudo -n docker compose logs --tail 40 collector 2>/dev/null || docker compose logs --tail 40 collector) | cut -c1-220
           sudo -n docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}' 2>/dev/null || docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}'
           free -m; df -h / | tail -1
           REMOTE
