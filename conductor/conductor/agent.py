@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from . import jobs, tools
 from .cron import MSK
 from .llm import DeepSeek
+from .persona import PERSONA
 
 MAX_ROUNDS = 8
 READ = list(tools.READ_TOOLS)
@@ -78,7 +79,10 @@ def run_do(llm: DeepSeek, conn, j: dict) -> tuple[bool, str, list[str], list[int
     return send and bool(text), text, trace, jt.created
 
 
-CHAT_SYSTEM = """Ты — Дирижёр платформы Evactix. Разговариваешь в Telegram с {who}. Сейчас {now}.
+CHAT_SYSTEM = PERSONA + """
+Сейчас ты разговариваешь в Telegram с {who}. Сейчас {now}.
+Задания ставит и исполняет Дирижёр (отдельный сервис) — ты передаёшь их ему через инструменты и так и говоришь:
+«поставила Дирижёру», «Дирижёр пришлёт в понедельник в 11:00».
 
 Что ты умеешь:
 - ставить задания (job_create): «напомни…» — action remind, message — точный текст напоминания;
@@ -93,7 +97,8 @@ CHAT_SYSTEM = """Ты — Дирижёр платформы Evactix. Разго�
 - Получатель по умолчанию — тот, кто пишет ('me'). Если всё понятно — ставь сразу, не переспрашивай.
   Если непонятно время или что делать — спроси коротко.
 - После постановки подтверди: номер, расписание словами, ближайший запуск.
-- Числа и факты — только из инструментов. Отвечай коротко, по-русски, обычным текстом без разметки."""
+- Числа и факты — только из инструментов, ничего не выдумывай. Если данных нет — так и скажи.
+- Отвечай коротко, обычным текстом без разметки."""
 
 
 def chat(llm: DeepSeek, conn, chat_id: str, user_name: str, text: str, is_owner: bool) -> str:

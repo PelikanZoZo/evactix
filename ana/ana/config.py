@@ -19,6 +19,8 @@ class Settings:
     telegram_chat: str = field(default_factory=lambda: os.getenv("TELEGRAM_CHAT_ID", ""))
     # Сервер не достаёт до api.telegram.org — ходим через переходник на Cloudflare (infra/telegram-relay)
     telegram_api: str = field(default_factory=lambda: os.getenv("TELEGRAM_API_BASE", "") or "https://api.telegram.org")
+    deepseek_key: str = field(default_factory=lambda: os.getenv("DEEPSEEK_API_KEY", "").strip())
+    voice_on: bool = field(default_factory=lambda: os.getenv("ANA_VOICE", "1") == "1")
     check_every: int = field(default_factory=lambda: int(os.getenv("CHECK_EVERY", "300")))
     digest_hour_msk: int = field(default_factory=lambda: int(os.getenv("DIGEST_HOUR_MSK", "9")))
     commit: str = field(default_factory=lambda: os.getenv("ANA_COMMIT", "dev")[:7])

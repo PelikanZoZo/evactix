@@ -25,7 +25,7 @@ class Settings:
     # Сервер не достаёт до api.telegram.org — ходим через переходник на Cloudflare (infra/telegram-relay)
     telegram_api: str = field(default_factory=lambda: (_env("TELEGRAM_API_BASE") or "https://api.telegram.org").rstrip("/"))
     allowed_chats: str = field(default_factory=lambda: _env("TELEGRAM_ALLOWED"))
-    deepseek_key: str = field(default_factory=lambda: _env("DEEPSEEK_API_KEY"))
+    deepseek_key: str = field(default_factory=lambda: _env("DEEPSEEK_API_KEY").strip())
     deepseek_model: str = field(default_factory=lambda: _env("DEEPSEEK_MODEL", "deepseek-chat"))
     commit: str = field(default_factory=lambda: _env("CONDUCTOR_COMMIT", "dev")[:7])
     tick_seconds: int = field(default_factory=lambda: int(_env("TICK_SECONDS", "10")))

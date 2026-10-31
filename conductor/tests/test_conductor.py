@@ -277,3 +277,12 @@ def test_webhook_recipient_signed(conn, settings, make_llm):
     assert req.headers["X-Evactix-Signature"] == expect and json.loads(req.content)["text"] == "Сигнал"
     with pytest.raises(JobError, match="владелец"):
         JobTools(conn, USER, is_owner=False).recipient_add(kind="telegram", name="x", address="5")
+
+
+def test_persona_same_as_ana():
+    import pathlib, re
+    root = pathlib.Path(__file__).resolve().parents[2]
+    grab = lambda p: re.search(r'PERSONA = """.*?"""', (root / p).read_text(encoding="utf-8"), re.S).group(0)
+    assert grab("conductor/conductor/persona.py") == grab("ana/ana/persona.py")
+    from conductor.agent import CHAT_SYSTEM
+    assert "Ты — Ана" in CHAT_SYSTEM and "{who}" in CHAT_SYSTEM
