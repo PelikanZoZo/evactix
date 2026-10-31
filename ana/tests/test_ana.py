@@ -132,3 +132,38 @@ def test_conductor_absent_is_quiet(core_db):
     import psycopg
     with psycopg.connect(f"host=127.0.0.1 port=5432 user=ana dbname={name}", autocommit=True) as a:
         assert checks.conductor(a) == []
+
+
+# ---------- голос Аны
+
+def _voice(reply, status=200):
+    import httpx
+    from ana.persona import Voice
+    h = lambda req: httpx.Response(status, json={"choices": [{"message": {"content": reply}}]})
+    return Voice("k", http=httpx.Client(transport=httpx.MockTransport(h)))
+
+
+def test_voice_keeps_facts():
+    src = "ЦБ РФ: нет свежих данных 52 ч (допустимо 2 days)."
+    ok = _voice("Так, ЦБ РФ молчит уже 52 ч, а допустимо 2 days. Это плохо.").say("crit", src)
+    assert ok.startswith("Так")
+    bad = _voice("ЦБ РФ молчит уже 50 ч.").say("crit", src)          # число исказила — уходит исходник
+    assert bad == src
+    assert _voice("что угодно", status=500).say("crit", src) == src     # DeepSeek недоступен — исходник
+    from ana.persona import Voice
+    assert Voice("").say("crit", src) == src                            # голос выключен
+
+
+def test_voice_used_for_alerts(core_db, tmp_path, monkeypatch):
+    name, c = core_db
+    c.execute("""insert into collector_runs (collector, source_id, started_at, finished_at, status) values
+                 ('cbr.fx','cbr.fx', now() - interval '5 days', now() - interval '5 days', 'ok')""")
+    ana, tg = make_ana(name, tmp_path, monkeypatch)
+    calls = []
+    class V:
+        def say(self, kind, text):
+            calls.append(kind)
+            return "ГОЛОС: " + text
+    ana.voice = V()
+    ana.tick()
+    assert "crit" in calls and any(t.startswith("🔴 ГОЛОС:") for t in tg.sent)

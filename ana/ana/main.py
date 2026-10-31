@@ -17,6 +17,7 @@ import psycopg
 
 from . import __version__, checks
 from .config import Settings
+from .persona import Voice
 from .state import State
 from .telegram import Telegram
 
@@ -31,8 +32,9 @@ def _on_signal(*_):
 
 
 class Ana:
-    def __init__(self, s: Settings, tg: Telegram | None = None, state: State | None = None):
+    def __init__(self, s: Settings, tg: Telegram | None = None, state: State | None = None, voice: Voice | None = None):
         self.s = s
+        self.voice = voice or Voice(s.deepseek_key if s.voice_on else "")
         self.tg = tg or Telegram(s.telegram_token, s.telegram_chat, s.telegram_api)
         os.makedirs(os.path.dirname(s.state_path) or ".", exist_ok=True)
         self.state = state or State(s.state_path)
@@ -45,13 +47,14 @@ class Ana:
             a = self.state.alert(f.key)
             icon = "🔴" if f.level == "crit" else "🟠"
             if a is None or a["resolved_at"] is not None:
-                self.state.open_alert(f.key, f.level, f.message, self.tg.send(f"{icon} {f.message}"))
+                self.state.open_alert(f.key, f.level, f.message,
+                                      self.tg.send(f"{icon} {self.voice.say(f.level, f.message)}"))
             elif a["last_sent"] is None or now - a["last_sent"] > REMIND_EVERY or (a["level"] != f.level and f.level == "crit"):
-                if self.tg.send(f"{icon} Всё ещё: {f.message}"):
+                if self.tg.send(f"{icon} {self.voice.say('remind', 'Всё ещё не решено: ' + f.message)}"):
                     self.state.touch_alert(f.key, f.level, f.message)
         for key, msg in self.state.active_alerts():
             if key not in active and not key.startswith(keep):
-                self.tg.send(f"🟢 В норме: {msg.split('.')[0]}")
+                self.tg.send(f"🟢 {self.voice.say('ok', 'В норме: ' + msg.split('.')[0])}")
                 self.state.resolve(key)
 
     def maybe_digest(self, conn) -> None:
@@ -61,7 +64,7 @@ class Ana:
         today = now.date().isoformat()
         if self.state.get("digest_date") == today:
             return
-        if self.tg.send(checks.digest(conn, self.s.disk_path)):
+        if self.tg.send(self.voice.say("digest", checks.digest(conn, self.s.disk_path))):
             self.state.set("digest_date", today)
 
     def tick(self) -> None:
@@ -89,7 +92,7 @@ def main() -> int:
             core = checks.core_release(conn)
     except Exception:
         core = "Evactix (ядро пока недоступно)"
-    ana.tg.send(f"👋 Ана v{__version__} ({s.commit}) на связи.\nСлежу за ядром {core}: база, диск, источники, Дирижёр, входная точка.")
+    ana.tg.send("👋 " + ana.voice.say("hello", f"Ана v{__version__} ({s.commit}) на связи. Слежу за ядром {core}: база, диск, источники, Дирижёр, входная точка."))
     while not _stop:
         try:
             ana.tick()
