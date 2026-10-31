@@ -36,6 +36,14 @@ SOURCES = [
            "https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php", "1 day"),
     Source("gdacs.alerts", "GDACS: глобальные оповещения о бедствиях", "open", 0.90, "attribution-EC-JRC-UN",
            "https://www.gdacs.org/", "1 day"),
+    Source("dwd.mosmix", "DWD MOSMIX: точечные прогнозы (Deutscher Wetterdienst)", "open", 0.82, "DWD-open-data-attribution",
+           "https://opendata.dwd.de/weather/local_forecasts/mos/", "12 hours"),
+    Source("noaa.gfs", "NOAA GFS 0.25°: глобальная модель", "open", 0.75, "public-domain",
+           "https://nomads.ncep.noaa.gov/", "18 hours"),
+    Source("ecmwf.ifs", "ECMWF IFS 0.25°: открытые данные", "open", 0.85, "CC-BY-4.0",
+           "https://www.ecmwf.int/en/forecasts/datasets/open-data", "18 hours"),
+    Source("weather.consensus", "Погодный консенсус четырёх моделей (ядро Evactix)", "computed", 0.85, "internal",
+           "", "3 hours"),
 ]
 
 
@@ -60,6 +68,10 @@ METRICS = [
     Metric("weather.wind_speed", "number", "m/s", "instant", "Скорость ветра, м/с"),
     Metric("weather.wind_from_direction", "cyclic", "deg", "instant", "Направление ветра (откуда), градусы"),
     Metric("weather.precipitation", "number", "mm", "sum", "Осадки за период, мм"),
+    Metric("weather.wind_gust", "number", "m/s", "max", "Порывы ветра, м/с"),
+    Metric("weather.precip_agreement", "ratio", "fraction", "instant", "Доля моделей, ждущих осадки ≥0.1 мм/ч"),
+    Metric("weather.frost_agreement", "ratio", "fraction", "instant", "Доля моделей, ждущих температуру ≤0 °C"),
+    Metric("weather.strong_wind_agreement", "ratio", "fraction", "instant", "Доля моделей, ждущих порывы ≥15 м/с"),
     Metric("quake.magnitude", "number", "Mw", "instant", "Магнитуда землетрясения"),
     Metric("hazard.alert_level", "ordinal", None, "instant", "Уровень угрозы GDACS: 1 зелёный, 2 оранжевый, 3 красный"),
 ]

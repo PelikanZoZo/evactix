@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 COLLECTORS = {
     "cbr.fx": 180, "cbr.metals": 360, "cbr.keyrate": 360, "xmlcalendar": 1440, "astro": 720,
     "metno.forecast": 60, "usgs.quakes": 15, "gdacs.alerts": 30,
+    "dwd.mosmix": 180, "noaa.gfs": 180, "ecmwf.ifs": 180, "weather.consensus": 60,
 }
 
 

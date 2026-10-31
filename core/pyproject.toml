@@ -1,6 +1,6 @@
 [project]
 name = "evactix-core"
-version = "1.2.0"
+version = "1.3.0"
 description = "Evactix: ядро — хранилище событий и планов, сборщики, сторож Ана"
 requires-python = ">=3.12"
 dependencies = [
@@ -9,6 +9,7 @@ dependencies = [
     "httpx==0.27.2",
     "astral==3.2",
     "h3==4.1.2",
+    "eccodes==2.39.2",
 ]
 
 [project.optional-dependencies]
