@@ -13,6 +13,9 @@ concurrency:
 jobs:
   setup:
     runs-on: ubuntu-latest
+    env:
+      # Если задан VPS_PASSWORD — вход по паролю (временный сервер), иначе по ключу VPS_SSH_KEY
+      SSHPASS: ${{ secrets.VPS_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -25,10 +28,12 @@ jobs:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
         run: |
           missing=0
-          for n in VPS_HOST VPS_PORT VPS_USER VPS_SSH_KEY POSTGRES_PASSWORD; do
+          for n in VPS_HOST VPS_PORT VPS_USER POSTGRES_PASSWORD; do
             if [ -n "${!n}" ]; then echo "OK      $n"; else echo "НЕТ     $n"; missing=1; fi
           done
-          case "$VPS_SSH_KEY" in *"BEGIN OPENSSH PRIVATE KEY"*) echo "Ключ: формат похож на правильный";; *) echo "Ключ: нет строки BEGIN OPENSSH PRIVATE KEY — скопирован не целиком?"; missing=1;; esac
+          if [ -n "$SSHPASS" ]; then echo "Вход: по паролю (VPS_PASSWORD)"
+          elif [ -n "$VPS_SSH_KEY" ]; then echo "Вход: по ключу (VPS_SSH_KEY)"
+          else echo "НЕТ ни VPS_PASSWORD, ни VPS_SSH_KEY"; missing=1; fi
           [ ${#POSTGRES_PASSWORD} -ge 20 ] || { echo "Пароль базы короче 20 символов"; missing=1; }
           exit $missing
 
@@ -41,7 +46,15 @@ jobs:
           VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
         run: |
           H="$(echo -n "$VPS_HOST" | tr -d '[:space:]')"; P="$(echo -n "$VPS_PORT" | tr -d '[:space:]')"
-          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          mkdir -p ~/.ssh ~/bin && chmod 700 ~/.ssh
+          if [ -n "$SSHPASS" ]; then
+            sudo apt-get install -y -qq sshpass >/dev/null
+            printf '#!/bin/bash\nexec sshpass -e ssh -o PubkeyAuthentication=no -o PreferredAuthentications=password,keyboard-interactive "$@"\n' > ~/bin/rsh
+          else
+            printf '#!/bin/bash\nexec ssh "$@"\n' > ~/bin/rsh
+          fi
+          chmod +x ~/bin/rsh; echo "$HOME/bin" >> "$GITHUB_PATH"
+          if [ -z "$SSHPASS" ]; then
           # Ключ мог исказиться при копировании из веб-консоли: пересобираем его из «тела» без пробелов и переносов
           printf '%s' "$VPS_SSH_KEY" | python3 -c '
           import sys, re, base64
@@ -61,6 +74,7 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           echo "Отпечаток ключа из секрета (сверить с сервером: ssh-keygen -lf /root/.ssh/authorized_keys):"
           ssh-keygen -lf <(ssh-keygen -y -f ~/.ssh/id_ed25519) || { echo "Ключ не читается — скопирован с ошибкой"; exit 1; }
+          fi
           if [ -n "$VPS_KNOWN_HOSTS" ]; then
             printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
           else
@@ -75,24 +89,25 @@ jobs:
         run: |
           U="$(echo -n "$VPS_USER" | tr -d '[:space:]')"; echo "U=$U" >> "$GITHUB_ENV"
           tar czf infra.tgz -C infra .
-          ssh -p "$P" -o ConnectTimeout=30 "$U@$H" 'rm -rf /tmp/evactix-infra && mkdir -p /tmp/evactix-infra && tar xzf - -C /tmp/evactix-infra' < infra.tgz
-          ssh -p "$P" -o ConnectTimeout=30 -o ServerAliveInterval=15 "$U@$H" \
-            'if [ "$(id -u)" = 0 ]; then bash /tmp/evactix-infra/bootstrap.sh; else sudo -n bash /tmp/evactix-infra/bootstrap.sh; fi'
+          rsh -p "$P" -o ConnectTimeout=30 "$U@$H" 'rm -rf /tmp/evactix-infra && mkdir -p /tmp/evactix-infra && tar xzf - -C /tmp/evactix-infra' < infra.tgz
+          KP=0; [ -n "$SSHPASS" ] && KP=1
+          rsh -p "$P" -o ConnectTimeout=30 -o ServerAliveInterval=15 "$U@$H" \
+            "if [ \"\$(id -u)\" = 0 ]; then KEEP_PASSWORD=$KP bash /tmp/evactix-infra/bootstrap.sh; else sudo -n KEEP_PASSWORD=$KP bash /tmp/evactix-infra/bootstrap.sh; fi"
 
       - name: Сервисы (база и входная точка)
         env:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
         run: |
           S='if [ "$(id -u)" = 0 ]; then bash -s; else sudo -n bash -s; fi'
-          ssh -p "$P" "$U@$H" "$S" <<'REMOTE'
+          rsh -p "$P" "$U@$H" "$S" <<'REMOTE'
           set -e
           install -o deploy -g deploy -m 640 /tmp/evactix-infra/docker-compose.yml /tmp/evactix-infra/Caddyfile /opt/evactix/
           install -o deploy -g deploy -m 750 /tmp/evactix-infra/backup.sh /opt/evactix/
           REMOTE
           # пароль передаём через stdin, в логи он не попадает
-          printf 'POSTGRES_PASSWORD=%s\n' "$POSTGRES_PASSWORD" | ssh -p "$P" "$U@$H" \
+          printf 'POSTGRES_PASSWORD=%s\n' "$POSTGRES_PASSWORD" | rsh -p "$P" "$U@$H" \
             'umask 077; if [ "$(id -u)" = 0 ]; then cat > /opt/evactix/.env && chown deploy:deploy /opt/evactix/.env; else sudo -n tee /opt/evactix/.env >/dev/null && sudo -n chown deploy:deploy /opt/evactix/.env; fi'
-          ssh -p "$P" -o ServerAliveInterval=15 "$U@$H" "$S" <<'REMOTE'
+          rsh -p "$P" -o ServerAliveInterval=15 "$U@$H" "$S" <<'REMOTE'
           set -e
           cd /opt/evactix
           sudo -u deploy docker compose pull -q
@@ -106,7 +121,7 @@ jobs:
 
       - name: Проверка
         run: |
-          ssh -p "$P" "$U@$H" 'bash -s' <<'REMOTE'
+          rsh -p "$P" "$U@$H" 'bash -s' <<'REMOTE'
           cd /opt/evactix
           echo "--- Контейнеры"; sudo -n docker compose ps 2>/dev/null || docker compose ps
           echo "--- PostgreSQL и TimescaleDB"
