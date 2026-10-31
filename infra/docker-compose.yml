@@ -84,6 +84,7 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       COLLECTOR_DB_PASSWORD: ${COLLECTOR_DB_PASSWORD:?нужен COLLECTOR_DB_PASSWORD}
       ANA_DB_PASSWORD: ${ANA_DB_PASSWORD:?нужен ANA_DB_PASSWORD}
+      CONDUCTOR_DB_PASSWORD: ${CONDUCTOR_DB_PASSWORD:?нужен CONDUCTOR_DB_PASSWORD}
 
   # Сборщики: только дописывают события и планы, свои ключи к базе
   collector:

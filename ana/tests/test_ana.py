@@ -109,3 +109,26 @@ def test_core_release_in_digest(core_db, tmp_path, monkeypatch):
     ana.tick()
     d = next(t for t in tg.sent if t.startswith("Ана · сводка"))
     assert "Evactix v1.0.0 (abc1234)" in d
+
+
+def test_conductor_checks(core_db, tmp_path, monkeypatch):
+    name, c = core_db
+    import psycopg
+    mig = pathlib.Path(__file__).resolve().parents[2] / "conductor" / "conductor" / "migrations" / "001_jobs.sql"
+    with psycopg.connect(f"host=127.0.0.1 port=5432 user=conductor dbname={name}", autocommit=True) as cc:
+        cc.execute(mig.read_text(encoding="utf-8"))
+        cc.execute("insert into jobs.heartbeat (id, at) values (1, now() - interval '20 minutes')")
+    ana, tg = make_ana(name, tmp_path, monkeypatch)
+    ana.tick()
+    assert any("Дирижёр молчит 20 мин" in t for t in tg.sent)
+    with psycopg.connect(f"host=127.0.0.1 port=5432 user=conductor dbname={name}", autocommit=True) as cc:
+        cc.execute("update jobs.heartbeat set at=now()")
+    ana.tick()
+    assert any(t.startswith("🟢 В норме: Дирижёр молчит") for t in tg.sent)
+
+
+def test_conductor_absent_is_quiet(core_db):
+    name, _ = core_db
+    import psycopg
+    with psycopg.connect(f"host=127.0.0.1 port=5432 user=ana dbname={name}", autocommit=True) as a:
+        assert checks.conductor(a) == []

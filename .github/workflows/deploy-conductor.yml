@@ -1,0 +1,119 @@
+name: Выкатка Дирижёра
+
+# Дирижёр — отдельный сервис рядом с ядром (папка conductor/, compose-проект evactix-conductor на сервере).
+# Запускается сам после слияния изменений в conductor/ в main, или вручную: Actions → «Выкатка Дирижёра» → Run workflow.
+# Ядро не трогает. Ключ к базе ядра (роль conductor) берёт на сервере из настроек ядра.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "conductor/**"
+      - ".github/workflows/deploy-conductor.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-conductor
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      pg:
+        image: timescale/timescaledb:2.17.2-pg16
+        env:
+          POSTGRES_USER: evactix
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U evactix" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Тесты Дирижёра (вместе со схемой ядра и сборщиками)
+        working-directory: conductor
+        env:
+          TEST_ADMIN_DSN: "host=127.0.0.1 port=5432 user=evactix dbname=postgres"
+        run: |
+          pip install -q -e ../core -e ".[test]"
+          python -m pytest -q
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      SSHPASS: ${{ secrets.VPS_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Подключение
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          H="$(echo -n "$VPS_HOST" | tr -d '[:space:]')"; P="$(echo -n "$VPS_PORT" | tr -d '[:space:]')"; U="$(echo -n "$VPS_USER" | tr -d '[:space:]')"
+          mkdir -p ~/.ssh ~/bin && chmod 700 ~/.ssh
+          if [ -n "$SSHPASS" ]; then
+            sudo apt-get install -y -qq sshpass >/dev/null
+            printf '#!/bin/bash\nexec sshpass -e ssh -o PubkeyAuthentication=no -o PreferredAuthentications=password,keyboard-interactive "$@"\n' > ~/bin/rsh
+          else
+            printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519; chmod 600 ~/.ssh/id_ed25519
+            printf '#!/bin/bash\nexec ssh "$@"\n' > ~/bin/rsh
+          fi
+          chmod +x ~/bin/rsh; echo "$HOME/bin" >> "$GITHUB_PATH"
+          ssh-keyscan -p "$P" -T 20 "$H" 2>/dev/null > ~/.ssh/known_hosts
+          { echo "H=$H"; echo "P=$P"; echo "U=$U"; } >> "$GITHUB_ENV"
+
+      - name: Ждём ядро
+        run: |
+          # Дирижёру нужны сеть ядра и выданный ядром ключ (роль conductor). Если ядро выкатывается одновременно — ждём до 15 минут.
+          rsh -p "$P" "$U@$H" 'bash -s' <<'REMOTE'
+          for i in $(seq 1 90); do
+            if docker network inspect evactix-core >/dev/null 2>&1 \
+               && sudo -n grep -q '^CONDUCTOR_DB_PASSWORD=' /opt/evactix/.env 2>/dev/null \
+               && [ "$(docker exec evactix-db-1 psql -U evactix -d evactix -tAc "select count(*) from pg_roles where rolname='conductor'" 2>/dev/null)" = 1 ]; then
+              echo "Ядро на месте"; exit 0
+            fi
+            sleep 10
+          done
+          echo "Ядро не выкачено: сначала нужна «Выкатка ядра»"; exit 1
+          REMOTE
+
+      - name: Файлы и настройки
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          tar czf conductor.tgz --exclude='__pycache__' --exclude='*.egg-info' --exclude='.pytest_cache' --exclude='tests' -C conductor .
+          rsh -p "$P" "$U@$H" 'rm -rf /tmp/evactix-conductor && mkdir -p /tmp/evactix-conductor && tar xzf - -C /tmp/evactix-conductor' < conductor.tgz
+          # Секреты идут через stdin; ключ к базе ядра копируется на сервере и в логи не попадает
+          REL=$(python3 -c "import tomllib;print(tomllib.load(open('conductor/pyproject.toml','rb'))['project']['version'])")
+          printf 'TELEGRAM_BOT_TOKEN=%s\nTELEGRAM_CHAT_ID=%s\nDEEPSEEK_API_KEY=%s\nCONDUCTOR_RELEASE=%s\nCONDUCTOR_COMMIT=%s\n' \
+            "$TELEGRAM_BOT_TOKEN" "$TELEGRAM_CHAT_ID" "$DEEPSEEK_API_KEY" "$REL" "$GITHUB_SHA" \
+          | rsh -p "$P" "$U@$H" 'if [ "$(id -u)" = 0 ]; then bash /tmp/evactix-conductor/install.sh; else sudo -n bash /tmp/evactix-conductor/install.sh; fi'
+
+      - name: Сборка и запуск
+        run: |
+          rsh -p "$P" -o ServerAliveInterval=15 "$U@$H" 'if [ "$(id -u)" = 0 ]; then bash -s; else sudo -n bash -s; fi' <<'REMOTE'
+          set -e
+          cd /opt/evactix-conductor
+          D="sudo -u deploy docker compose"
+          $D build -q conductor
+          $D up -d --remove-orphans conductor
+          sleep 30
+          $D ps
+          echo "==> Журнал Дирижёра"
+          $D logs --tail 30 conductor
+          echo "==> Связь с сервера"
+          curl -s -o /dev/null -m 10 -w 'api.telegram.org: %{http_code}\n' https://api.telegram.org/ || echo "api.telegram.org: нет ответа"
+          curl -s -o /dev/null -m 10 -w 'api.deepseek.com: %{http_code}\n' https://api.deepseek.com/ || echo "api.deepseek.com: нет ответа"
+          echo "==> Задания"
+          docker exec evactix-db-1 psql -U evactix -d evactix -P pager=off -c "select id, title, exec_status, to_char(next_run_at at time zone 'Europe/Moscow','DD.MM HH24:MI') as next_msk from jobs.jobs order by id" </dev/null
+          rm -rf /tmp/evactix-conductor
+          REMOTE

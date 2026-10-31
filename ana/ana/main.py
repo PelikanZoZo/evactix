@@ -68,14 +68,14 @@ class Ana:
         findings = checks.disk(self.s.disk_path, self.s.disk_warn_pct, self.s.disk_crit_pct) + checks.edge(self.s.edge_url)
         try:
             with psycopg.connect(self.s.dsn(), autocommit=True) as conn:
-                findings += checks.sources(conn) + checks.rejects(conn)
+                findings += checks.sources(conn) + checks.rejects(conn) + checks.conductor(conn)
                 self.handle(findings)
                 self.maybe_digest(conn)
         except psycopg.OperationalError as e:
             log.error("база ядра недоступна: %s", type(e).__name__)
             findings.append(checks.Finding("core_db", "crit", "База ядра недоступна. Сборщики стоят, данные не пишутся."))
             # Тревоги по данным не закрываем: без связи с базой не знаем, исправились ли они
-            self.handle(findings, keep=("stale:", "errors:", "rejects:"))
+            self.handle(findings, keep=("stale:", "errors:", "rejects:", "conductor:"))
 
 
 def main() -> int:
@@ -89,7 +89,7 @@ def main() -> int:
             core = checks.core_release(conn)
     except Exception:
         core = "Evactix (ядро пока недоступно)"
-    ana.tg.send(f"👋 Ана v{__version__} ({s.commit}) на связи.\nСлежу за ядром {core}: база, диск, источники, входная точка.")
+    ana.tg.send(f"👋 Ана v{__version__} ({s.commit}) на связи.\nСлежу за ядром {core}: база, диск, источники, Дирижёр, входная точка.")
     while not _stop:
         try:
             ana.tick()

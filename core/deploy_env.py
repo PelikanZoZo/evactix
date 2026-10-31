@@ -1,7 +1,7 @@
 """Обновляет /opt/evactix/.env при выкатке. Читает KEY=VALUE из stdin.
 
 - Переданные значения записывает (пустые не затирают существующие).
-- Пароли ролей collector и ana генерирует один раз, если их ещё нет.
+- Пароли ролей collector, ana и conductor генерирует один раз, если их ещё нет.
 - Ничего не печатает, кроме списка ключей.
 """
 import os
@@ -24,7 +24,7 @@ for line in sys.stdin:
         if v:
             env[k] = v
 
-for k in ("COLLECTOR_DB_PASSWORD", "ANA_DB_PASSWORD"):
+for k in ("COLLECTOR_DB_PASSWORD", "ANA_DB_PASSWORD", "CONDUCTOR_DB_PASSWORD"):
     if not env.get(k):
         env[k] = secrets.token_urlsafe(32)
 

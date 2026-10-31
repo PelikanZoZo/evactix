@@ -66,6 +66,38 @@ def rejects(conn, per_hour: int = 20) -> list[Finding]:
             for sid, n, reason in rows]
 
 
+def conductor(conn) -> list[Finding]:
+    """Дирижёр: пульс, зависшие задания, серии ошибок, размножение заданий, застрявшая отправка."""
+    import psycopg
+    try:
+        hb = conn.execute("select extract(epoch from now() - at) from jobs.heartbeat where id=1").fetchone()
+    except (psycopg.errors.UndefinedTable, psycopg.errors.InvalidSchemaName, psycopg.errors.InsufficientPrivilege):
+        return []                                        # Дирижёр ещё не выкачен (нет схемы или доступа к ней)
+    out = []
+    if not hb or hb[0] is None or hb[0] > 300:
+        mins = (hb[0] / 60) if hb and hb[0] is not None else None
+        out.append(Finding("conductor:pulse", "crit",
+                           f"Дирижёр молчит {mins:.0f} мин. Задания не выполняются." if mins else "Дирижёр не подаёт пульс. Задания не выполняются."))
+        return out
+    stuck = conn.execute("""select count(*), min(id) from jobs.jobs where status='active' and exec_status='running'
+                            and lock_until < now() - interval '5 minutes'""").fetchone()
+    if stuck[0]:
+        out.append(Finding("conductor:stuck", "warn", f"Зависших заданий: {stuck[0]} (например №{stuck[1]})."))
+    failed = conn.execute("""select id, title from jobs.jobs where status='active' and exec_status='failed'
+                             and fail_streak >= 3 order by id limit 3""").fetchall()
+    for jid, title in failed:
+        out.append(Finding(f"conductor:failed:{jid}", "warn", f"Задание №{jid} «{title}» не выполняется: три ошибки подряд."))
+    spawn = conn.execute("""select count(*) from jobs.jobs where author_type in ('agent','service')
+                            and created_at > now() - interval '1 hour'""").fetchone()[0]
+    if spawn >= 10:
+        out.append(Finding("conductor:spawn", "warn", f"За час агенты и сервисы поставили {spawn} заданий. Проверь, не размножаются ли."))
+    stale = conn.execute("""select count(*) from jobs.outbox where status='pending'
+                            and created_at < now() - interval '15 minutes'""").fetchone()[0]
+    if stale:
+        out.append(Finding("conductor:outbox", "warn", f"Сообщений застряло в отправке: {stale}."))
+    return out
+
+
 def edge(url: str) -> list[Finding]:
     try:
         r = httpx.get(url, timeout=5)
