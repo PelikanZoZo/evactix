@@ -57,10 +57,15 @@ def ensure_system_jobs(conn) -> list[int]:
     for name, minutes in COLLECTORS.items():
         key = f"collect:{name}"
         if conn.execute("select 1 from jobs.jobs where system_key=%s", (key,)).fetchone():
+            # ещё ни разу не собирал — не ждём полный интервал
+            conn.execute("""update jobs.jobs set next_run_at=now() where system_key=%s and status='active'
+                            and last_run_at is null and next_run_at > now()""", (key,))
             continue
         with conn.transaction():
-            made.append(jobs.create(conn, {"title": f"Сбор: {name}", "action": "builtin", "handler": key,
-                                           "every_minutes": minutes}, SYSTEM, system_key=key))
+            jid = jobs.create(conn, {"title": f"Сбор: {name}", "action": "builtin", "handler": key,
+                                     "every_minutes": minutes}, SYSTEM, system_key=key)
+            conn.execute("update jobs.jobs set next_run_at=now() where id=%s", (jid,))   # новый сборщик — первый сбор сразу
+            made.append(jid)
     return made
 
 
