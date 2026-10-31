@@ -1,0 +1,67 @@
+# Источники данных: проверка доступности с сервера.
+# Формат: группа | название | URL (запрос без ключа; 401/403 с ключом-заглушкой тоже значит «сервер достижим»)
+
+# --- Россия
+ru | ЦБ: курсы | https://www.cbr.ru/scripts/XML_daily.asp
+ru | Мосбиржа ISS | https://iss.moex.com/iss/index.json
+ru | ЕМИСС | https://www.fedstat.ru/
+ru | Производственный календарь isdayoff | https://isdayoff.ru/today
+ru | xmlcalendar | https://xmlcalendar.ru/
+ru | Госзакупки | https://zakupki.gov.ru/
+ru | ФНС открытые данные | https://www.nalog.gov.ru/opendata/
+ru | Федресурс | https://fedresurs.ru/
+ru | СО ЕЭС | https://www.so-ups.ru/
+ru | АТС | https://www.atsenergo.ru/
+ru | Открытые данные Москвы | https://apidata.mos.ru/
+ru | Яндекс Расписания | https://api.rasp.yandex.net/v3.0/
+ru | Яндекс Погода | https://api.weather.yandex.ru/
+
+# --- Погода и природа
+wx | Open-Meteo | https://api.open-meteo.com/v1/forecast?latitude=55.75&longitude=37.62&current=temperature_2m
+wx | ECMWF Open Data | https://data.ecmwf.int/forecasts/
+wx | Copernicus CDS | https://cds.climate.copernicus.eu/
+wx | Copernicus EWDS | https://ewds.climate.copernicus.eu/
+wx | Copernicus Marine | https://data.marine.copernicus.eu/
+wx | DWD Open Data | https://opendata.dwd.de/
+wx | Met Norway | https://api.met.no/weatherapi/locationforecast/2.0/status
+wx | NOAA NOMADS | https://nomads.ncep.noaa.gov/
+wx | NOAA GFS на AWS | https://noaa-gfs-bdp-pds.s3.amazonaws.com/
+wx | NOAA NCEI | https://www.ncei.noaa.gov/access/services/data/v1
+wx | NOAA SWPC | https://services.swpc.noaa.gov/json/
+wx | USGS землетрясения | https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/significant_day.geojson
+wx | EMSC | https://www.seismicportal.eu/fdsnws/event/1/query?limit=1&format=json
+wx | GDACS | https://www.gdacs.org/xml/rss.xml
+wx | NASA FIRMS | https://firms.modaps.eosdis.nasa.gov/api/
+wx | NASA EONET | https://eonet.gsfc.nasa.gov/api/v3/events?limit=1
+wx | NASA POWER | https://power.larc.nasa.gov/
+wx | OpenWeatherMap | https://api.openweathermap.org/
+wx | USNO астрономия | https://aa.usno.navy.mil/api/rstt/oneday?date=2026-11-01&coords=55.75,37.62
+wx | Nager.Date | https://date.nager.at/api/v3/PublicHolidays/2026/RU
+wx | GeoNames | https://download.geonames.org/export/dump/
+wx | OSM Geofabrik | https://download.geofabrik.de/russia.html
+
+# --- Экономика, торговля, логистика, энергетика
+ec | World Bank | https://api.worldbank.org/v2/country/RU?format=json
+ec | IMF Data | https://data.imf.org/
+ec | OECD SDMX | https://sdmx.oecd.org/public/rest/
+ec | Eurostat | https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/ei_bsco_m?lastTimePeriod=1
+ec | ECB курсы | https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml
+ec | UN Comtrade | https://comtradeapi.un.org/
+ec | Frankfurter | https://api.frankfurter.dev/v1/latest
+ec | EIA | https://api.eia.gov/
+ec | USDA FAS | https://apps.fas.usda.gov/opendatawebV2/
+ec | FAOSTAT | https://www.fao.org/faostat/
+ec | ENTSO-E | https://web-api.tp.entsoe.eu/
+ec | ENTSOG | https://transparency.entsog.eu/api/v1/
+ec | GIE AGSI | https://agsi.gie.eu/api
+ec | IMF PortWatch | https://services9.arcgis.com/weJ1QsnbMYJlCHdG/ArcGIS/rest/services/Daily_Chokepoints_Data/FeatureServer?f=json
+ec | aisstream | https://aisstream.io/
+ec | GDELT | https://api.gdeltproject.org/api/v2/doc/doc?query=port&mode=artlist&maxrecords=1&format=json
+ec | GLEIF | https://api.gleif.org/api/v1/lei-records?page[size]=1
+ec | OFAC | https://sanctionslistservice.ofac.treas.gov/
+ec | Санкции ЕС | https://webgate.ec.europa.eu/fsd/fsf/
+ec | Санкции UK | https://www.gov.uk/government/publications/the-uk-sanctions-list
+ec | Санкции ООН | https://scsanctions.un.org/resources/xml/en/consolidated.xml
+ec | Binance | https://api.binance.com/api/v3/ping
+ec | TCMB EVDS | https://evds2.tcmb.gov.tr/
+ec | Казахстан data.egov | https://data.egov.kz/

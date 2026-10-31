@@ -1,0 +1,61 @@
+name: Доступность источников с сервера
+
+# Запуск вручную: Actions → «Доступность источников с сервера» → Run workflow.
+# С сервера VPS-1 обращается к каждому источнику из infra/api-hosts.txt
+# и показывает код ответа и время. Ничего не меняет на сервере.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      SSHPASS: ${{ secrets.VPS_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Подключение
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          H="$(echo -n "$VPS_HOST" | tr -d '[:space:]')"; P="$(echo -n "$VPS_PORT" | tr -d '[:space:]')"; U="$(echo -n "$VPS_USER" | tr -d '[:space:]')"
+          mkdir -p ~/.ssh ~/bin && chmod 700 ~/.ssh
+          if [ -n "$SSHPASS" ]; then
+            sudo apt-get install -y -qq sshpass >/dev/null
+            printf '#!/bin/bash\nexec sshpass -e ssh -o PubkeyAuthentication=no -o PreferredAuthentications=password,keyboard-interactive "$@"\n' > ~/bin/rsh
+          else
+            printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519; chmod 600 ~/.ssh/id_ed25519
+            printf '#!/bin/bash\nexec ssh "$@"\n' > ~/bin/rsh
+          fi
+          chmod +x ~/bin/rsh; echo "$HOME/bin" >> "$GITHUB_PATH"
+          ssh-keyscan -p "$P" -T 20 "$H" 2>/dev/null > ~/.ssh/known_hosts
+          { echo "H=$H"; echo "P=$P"; echo "U=$U"; } >> "$GITHUB_ENV"
+
+      - name: Проверка источников
+        run: |
+          grep -vE '^\s*(#|$)' infra/api-hosts.txt | rsh -p "$P" "$U@$H" 'cat > /tmp/evactix-api-hosts.txt'
+          rsh -p "$P" "$U@$H" 'bash -s' <<'REMOTE' > result.txt
+          ok=0; bad=0
+          while IFS='|' read -r g name url; do
+            g=$(echo $g); name=$(echo $name | sed 's/^ *//;s/ *$//'); url=$(echo $url)
+            out=$(curl -g -s -o /dev/null -L --max-time 20 -A "Evactix-reachability/1.0 (dev@evactix.local)" \
+                  -w '%{http_code} %{time_total}' "$url" </dev/null)
+            code=${out%% *}; t=${out##* }
+            case "$code" in
+              2*|3*) mark="OK  "; ok=$((ok+1));;
+              400|401|403|404|405|429) mark="ЕСТЬ"; ok=$((ok+1));;
+              000) mark="НЕТ "; bad=$((bad+1));;
+              451) mark="БЛОК"; bad=$((bad+1));;
+              *) mark="?   "; bad=$((bad+1));;
+            esac
+            printf '%s  %-3s %-4s %6ss  %s\n' "$mark" "$g" "$code" "$t" "$name"
+          done < /tmp/evactix-api-hosts.txt
+          rm -f /tmp/evactix-api-hosts.txt
+          echo; echo "Достижимы: $ok, нет ответа или ошибка: $bad"
+          REMOTE
+          cat result.txt
+          { echo '### Доступность источников с VPS-1'; echo; echo 'OK — ответил; ЕСТЬ — сервер достижим, но нужен ключ или запрос с параметрами; НЕТ — не отвечает (блокировка или таймаут); БЛОК — отказ по юридическим причинам (451)'; echo; echo '```'; cat result.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
