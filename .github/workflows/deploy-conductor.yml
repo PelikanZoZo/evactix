@@ -106,7 +106,7 @@ jobs:
           cd /opt/evactix-conductor
           D="sudo -u deploy docker compose"
           $D build -q conductor
-          $D up -d --remove-orphans conductor
+          $D up -d --force-recreate --remove-orphans conductor
           sleep 30
           $D ps
           echo "==> Журнал Дирижёра"
