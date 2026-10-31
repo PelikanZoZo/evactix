@@ -19,7 +19,7 @@ class Settings:
     telegram_chat: str = field(default_factory=lambda: os.getenv("TELEGRAM_CHAT_ID", ""))
     check_every: int = field(default_factory=lambda: int(os.getenv("CHECK_EVERY", "300")))
     digest_hour_msk: int = field(default_factory=lambda: int(os.getenv("DIGEST_HOUR_MSK", "9")))
-    version: str = field(default_factory=lambda: os.getenv("ANA_VERSION", "dev")[:7])
+    commit: str = field(default_factory=lambda: os.getenv("ANA_COMMIT", "dev")[:7])
 
     def dsn(self) -> str:
         return (f"host={self.db_host} port={self.db_port} dbname={self.db_name} user={self.db_user} "

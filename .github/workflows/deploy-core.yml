@@ -13,6 +13,7 @@ on:
       - "infra/docker-compose.yml"
       - "infra/Caddyfile"
       - "infra/backup.sh"
+      - "VERSION"
       - ".github/workflows/deploy-core.yml"
   workflow_dispatch:
 
@@ -75,7 +76,7 @@ jobs:
 
       - name: Файлы на сервер
         run: |
-          tar czf deploy.tgz --exclude=core/tests --exclude='__pycache__' --exclude='*.egg-info' infra/docker-compose.yml infra/Caddyfile infra/backup.sh core
+          tar czf deploy.tgz --exclude=core/tests --exclude='__pycache__' --exclude='*.egg-info' VERSION infra/docker-compose.yml infra/Caddyfile infra/backup.sh core
           rsh -p "$P" "$U@$H" 'rm -rf /tmp/evactix-deploy && mkdir -p /tmp/evactix-deploy && tar xzf - -C /tmp/evactix-deploy' < deploy.tgz
           rsh -p "$P" "$U@$H" 'if [ "$(id -u)" = 0 ]; then bash -s; else sudo -n bash -s; fi' <<'REMOTE'
           set -e
@@ -90,7 +91,7 @@ jobs:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
         run: |
           # Значения идут через stdin, в командной строке и логах их нет
-          printf 'POSTGRES_PASSWORD=%s\nEVACTIX_VERSION=%s\n' "$POSTGRES_PASSWORD" "$GITHUB_SHA" \
+          printf 'POSTGRES_PASSWORD=%s\nEVACTIX_RELEASE=%s\nEVACTIX_COMMIT=%s\n' "$POSTGRES_PASSWORD" "$(cat VERSION)" "$GITHUB_SHA" \
           | rsh -p "$P" "$U@$H" 'if [ "$(id -u)" = 0 ]; then python3 /tmp/evactix-deploy/core/deploy_env.py /opt/evactix/.env; else sudo -n python3 /tmp/evactix-deploy/core/deploy_env.py /opt/evactix/.env; fi'
 
       - name: Сборка, миграции, запуск
@@ -101,7 +102,7 @@ jobs:
           D="sudo -u deploy docker compose"
           $D up -d db edge
           for i in $(seq 1 30); do [ "$(docker inspect -f '{{.State.Health.Status}}' evactix-db-1)" = healthy ] && break; sleep 3; done
-          echo "==> Сборка образа ядра"
+          echo "==> Сборка образа ядра Evactix v$(grep ^EVACTIX_RELEASE= .env | cut -d= -f2)"
           $D build -q collector
           echo "==> Миграции"
           $D run --rm -T migrate </dev/null
@@ -122,5 +123,6 @@ jobs:
           Q -c "select collector, status, written, skipped, rejected, to_char(started_at,'HH24:MI:SS') as started, left(coalesce(error,''),80) as error from collector_runs order by id desc limit 12" </dev/null
           Q -c "select source_id, count(*) as events, min(occurred_at)::date as from_date, max(occurred_at)::date as to_date from events group by 1 order by 1" </dev/null
           Q -c "select count(*) as plans from plans" </dev/null
+          Q -At -c "select string_agg(key || ': ' || value, ' · ' order by key) from system_info" </dev/null
           REMOTE
           { echo '### Выкатка ядра'; echo '```'; cat summary.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

@@ -76,6 +76,15 @@ def edge(url: str) -> list[Finding]:
     return []
 
 
+def core_release(conn) -> str:
+    """Версия ядра из его паспорта (system_info)."""
+    try:
+        rows = dict(conn.execute("select key, value from system_info").fetchall())
+    except Exception:
+        return "Evactix (версия неизвестна)"
+    return f"{rows.get('product', 'Evactix')} v{rows.get('release', '?')} ({rows.get('commit', '?')[:7]})"
+
+
 def digest(conn, disk_path: str) -> str:
     u = shutil.disk_usage(disk_path)
     rows = conn.execute("""
@@ -89,7 +98,7 @@ def digest(conn, disk_path: str) -> str:
     rej = conn.execute("select count(*) from rejects where recorded_at > now() - interval '24 hours'").fetchone()[0]
     dbsize = conn.execute("select pg_size_pretty(pg_database_size(current_database()))").fetchone()[0]
     sp = lambda n: f"{n:,}".replace(",", " ")
-    lines = [f"Ана · сводка за сутки ({datetime.now(MSK):%d.%m %H:%M} МСК)", ""]
+    lines = [f"Ана · сводка за сутки ({datetime.now(MSK):%d.%m %H:%M} МСК)", core_release(conn), ""]
     for name, written, errors in rows:
         lines.append(("⚠️ " if errors else "✅ ") + f"{name}: +{sp(written)}" + (f", ошибок {errors}" if errors else ""))
     lines += ["", f"Всего событий: {sp(total_e)}", f"Планов: {sp(total_p)}",

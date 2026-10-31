@@ -22,7 +22,6 @@ def moon_phase_fraction(dt: datetime) -> float:
 class AstroCollector(Collector):
     name = "astro"
     source_id = "astro"
-    version = "0.1"
     interval = timedelta(hours=12)
     moon_days = 400
     sun_days = 30

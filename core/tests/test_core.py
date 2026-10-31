@@ -189,3 +189,21 @@ def test_runner_as_collector_role(db, raw, fixture_bytes):
         assert r.written > 0
     assert db.execute("select status, written from collector_runs").fetchone() == ("ok", r.written)
 
+
+
+def test_version_single_source():
+    import pathlib, tomllib
+    import evactix
+    root = pathlib.Path(__file__).resolve().parents[2]
+    v = (root / "VERSION").read_text().strip()
+    assert evactix.__version__ == v
+    assert tomllib.load(open(root / "core" / "pyproject.toml", "rb"))["project"]["version"] == v
+
+
+def test_system_info(db, monkeypatch):
+    from evactix import __version__
+    from evactix.migrate import write_system_info
+    monkeypatch.setenv("EVACTIX_COMMIT", "abcdef1234567890")
+    write_system_info(db)
+    info = dict(db.execute("select key, value from system_info").fetchall())
+    assert info["product"] == "Evactix" and info["release"] == __version__ and info["commit"] == "abcdef123456"

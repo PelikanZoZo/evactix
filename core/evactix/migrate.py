@@ -6,6 +6,7 @@ from importlib import resources
 import psycopg
 from psycopg import sql
 
+from . import __version__
 from .config import settings
 
 
@@ -33,6 +34,15 @@ def set_role_passwords(conn: psycopg.Connection) -> list[str]:
     return changed
 
 
+def write_system_info(conn: psycopg.Connection) -> None:
+    info = {"product": "Evactix", "release": __version__, "commit": os.getenv("EVACTIX_COMMIT", "dev")[:12]}
+    for k, v in info.items():
+        conn.execute("""insert into system_info (key, value, updated_at) values (%s,%s,now())
+                        on conflict (key) do update set value=excluded.value, updated_at=now()""", (k, v))
+    conn.execute("""insert into system_info (key, value, updated_at) values ('deployed_at', now()::text, now())
+                    on conflict (key) do update set value=excluded.value, updated_at=now()""")
+
+
 def main() -> int:
     s = settings()
     with psycopg.connect(s.dsn(), autocommit=True) as conn:
@@ -40,7 +50,8 @@ def main() -> int:
         roles = set_role_passwords(conn)
         from .catalog import sync_catalog
         sync_catalog(conn)
-    print(f"Миграции: {', '.join(applied) or 'новых нет'}; пароли ролей: {', '.join(roles) or 'не заданы'}; справочники обновлены")
+        write_system_info(conn)
+    print(f"Evactix v{__version__}. Миграции: {', '.join(applied) or 'новых нет'}; пароли ролей: {', '.join(roles) or 'не заданы'}; справочники обновлены")
     return 0
 
 

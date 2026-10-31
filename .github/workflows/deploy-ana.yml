@@ -92,7 +92,8 @@ jobs:
           tar czf ana.tgz --exclude='__pycache__' --exclude='*.egg-info' --exclude='.pytest_cache' -C ana .
           rsh -p "$P" "$U@$H" 'rm -rf /tmp/evactix-ana && mkdir -p /tmp/evactix-ana && tar xzf - -C /tmp/evactix-ana' < ana.tgz
           # Секреты идут через stdin; ключ к базе ядра копируется на сервере и в логи не попадает
-          printf 'TELEGRAM_BOT_TOKEN=%s\nTELEGRAM_CHAT_ID=%s\nANA_VERSION=%s\n' "$TELEGRAM_BOT_TOKEN" "$TELEGRAM_CHAT_ID" "$GITHUB_SHA" \
+          REL=$(python3 -c "import tomllib;print(tomllib.load(open('ana/pyproject.toml','rb'))['project']['version'])")
+          printf 'TELEGRAM_BOT_TOKEN=%s\nTELEGRAM_CHAT_ID=%s\nANA_RELEASE=%s\nANA_COMMIT=%s\n' "$TELEGRAM_BOT_TOKEN" "$TELEGRAM_CHAT_ID" "$REL" "$GITHUB_SHA" \
           | rsh -p "$P" "$U@$H" 'if [ "$(id -u)" = 0 ]; then bash /tmp/evactix-ana/install.sh; else sudo -n bash /tmp/evactix-ana/install.sh; fi'
 
       - name: Сборка и запуск

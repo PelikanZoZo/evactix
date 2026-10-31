@@ -1,4 +1,4 @@
-# Сервисы Evactix на VPS-1. Настроено под небольшой сервер (2 ГБ RAM).
+# Сервисы Evactix v1 на VPS-1. Настроено под небольшой сервер (2 ГБ RAM).
 name: evactix
 
 x-logging: &logging
@@ -8,7 +8,7 @@ x-logging: &logging
     max-file: "3"
 
 x-core: &core
-  image: evactix-core:latest
+  image: evactix-core:${EVACTIX_RELEASE:-dev}
   build:
     context: ./core
   restart: unless-stopped
@@ -20,7 +20,7 @@ x-core: &core
     DB_HOST: db
     DB_NAME: evactix
     RAW_DIR: /data/raw
-    EVACTIX_VERSION: ${EVACTIX_VERSION:-dev}
+    EVACTIX_COMMIT: ${EVACTIX_COMMIT:-dev}
 
 services:
   db:

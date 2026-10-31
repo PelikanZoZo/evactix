@@ -11,7 +11,7 @@ class Settings:
     db_user: str = os.getenv("DB_USER", "evactix")
     db_password: str = os.getenv("DB_PASSWORD", "")
     raw_dir: str = os.getenv("RAW_DIR", "/data/raw")
-    user_agent: str = os.getenv("HTTP_USER_AGENT", "Evactix/0.1 (+https://evactix.ru; dev@evactix.local)")
+    user_agent: str = os.getenv("HTTP_USER_AGENT", "Evactix/1.0 (+https://evactix.ru; dev@evactix.local)")
     telegram_token: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
     telegram_chat: str = os.getenv("TELEGRAM_CHAT_ID", "")
     disk_path: str = os.getenv("DISK_PATH", "/data")

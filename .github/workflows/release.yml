@@ -1,0 +1,35 @@
+name: Релиз
+
+# Когда в main меняется файл VERSION — ставит метку v<версия> и публикует релиз
+# с описанием этой версии из CHANGELOG.md.
+
+on:
+  push:
+    branches: [main]
+    paths: ["VERSION"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Метка и релиз
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V=$(tr -d '[:space:]' < VERSION)
+          TAG="v$V"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Метка $TAG уже есть"; exit 0
+          fi
+          # Описание версии — раздел «## [V]» из CHANGELOG.md до следующего «## [»
+          awk -v v="$V" '$0 ~ "^## \\[" v "\\]" {on=1; next} on && /^## \[/ {exit} on {print}' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "Evactix $TAG" > notes.md
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "Evactix $TAG" --notes-file notes.md
+          echo "Опубликован релиз $TAG" >> "$GITHUB_STEP_SUMMARY"

@@ -19,7 +19,7 @@ class Batch:
 class Collector:
     name: str = ""            # уникальное имя сборщика
     source_id: str = ""       # источник из справочника
-    version: str = "0.1"
+    version: str = "1.0"
     interval: timedelta = timedelta(hours=1)
 
     def __init__(self, http: httpx.Client, raw: RawStore):

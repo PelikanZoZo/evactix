@@ -1,10 +1,10 @@
-# Ана — отдельный проект рядом с ядром. Своя жизнь: обновляется и перезапускается независимо.
+# Ана — отдельный проект рядом с ядром Evactix v1. Своя жизнь: обновляется и перезапускается независимо.
 # К ядру подключается через его сеть evactix-core, ключом на чтение (роль ana).
 name: evactix-ana
 
 services:
   ana:
-    image: evactix-ana:latest
+    image: evactix-ana:${ANA_RELEASE:-dev}
     build:
       context: .
     restart: unless-stopped
@@ -21,7 +21,7 @@ services:
       CORE_EDGE_URL: http://edge/health
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
-      ANA_VERSION: ${ANA_VERSION:-dev}
+      ANA_COMMIT: ${ANA_COMMIT:-dev}
       ANA_STATE: /state/ana.db
       DISK_PATH: /state
     volumes:

@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 
 import psycopg
 
-from . import checks
+from . import __version__, checks
 from .config import Settings
 from .state import State
 from .telegram import Telegram
@@ -84,7 +84,12 @@ def main() -> int:
     signal.signal(signal.SIGINT, _on_signal)
     s = Settings()
     ana = Ana(s)
-    ana.tg.send(f"👋 Ана на связи (версия {s.version}). Слежу за ядром: база, диск, источники, входная точка.")
+    try:
+        with psycopg.connect(s.dsn(), autocommit=True) as conn:
+            core = checks.core_release(conn)
+    except Exception:
+        core = "Evactix (ядро пока недоступно)"
+    ana.tg.send(f"👋 Ана v{__version__} ({s.commit}) на связи.\nСлежу за ядром {core}: база, диск, источники, входная точка.")
     while not _stop:
         try:
             ana.tick()

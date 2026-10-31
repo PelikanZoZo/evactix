@@ -100,3 +100,12 @@ def test_core_db_down_keeps_data_alerts(core_db, tmp_path, monkeypatch):
     object.__setattr__(ana.s, "db_port", 5432)
     ana.tick()
     assert any(t.startswith("🟢 В норме: База ядра недоступна") for t in tg.sent)
+
+
+def test_core_release_in_digest(core_db, tmp_path, monkeypatch):
+    name, c = core_db
+    c.execute("insert into system_info (key, value) values ('product','Evactix'),('release','1.0.0'),('commit','abc1234def')")
+    ana, tg = make_ana(name, tmp_path, monkeypatch)
+    ana.tick()
+    d = next(t for t in tg.sent if t.startswith("Ана · сводка"))
+    assert "Evactix v1.0.0 (abc1234)" in d
