@@ -175,7 +175,9 @@ def test_plan_trigger_moves_and_closes(conn, admin, settings, make_llm):
 def test_collect_jobs_make_commands(conn, settings, make_llm, dbname):
     llm, _ = make_llm([])
     made = service.ensure_system_jobs(conn)
-    assert len(made) == 8 and service.ensure_system_jobs(conn) == []
+    assert len(made) == len(service.COLLECTORS) and service.ensure_system_jobs(conn) == []
+    from evactix.collectors import ALL
+    assert set(service.COLLECTORS) == {c.name for c in ALL}       # у каждого сборщика ядра есть задание
     jid = conn.execute("select id from jobs.jobs where system_key='collect:cbr.fx'").fetchone()[0]
     due(conn, jid)
     tick(conn, llm)
