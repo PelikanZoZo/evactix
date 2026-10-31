@@ -1,0 +1,38 @@
+# Ана — отдельный проект рядом с ядром. Своя жизнь: обновляется и перезапускается независимо.
+# К ядру подключается через его сеть evactix-core, ключом на чтение (роль ana).
+name: evactix-ana
+
+services:
+  ana:
+    image: evactix-ana:latest
+    build:
+      context: .
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      CORE_DB_HOST: db
+      CORE_DB_NAME: evactix
+      CORE_DB_USER: ana
+      CORE_DB_PASSWORD: ${CORE_DB_PASSWORD:?нужен CORE_DB_PASSWORD}
+      CORE_EDGE_URL: http://edge/health
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      ANA_VERSION: ${ANA_VERSION:-dev}
+      ANA_STATE: /state/ana.db
+      DISK_PATH: /state
+    volumes:
+      - anastate:/state
+    networks: [core]
+    mem_limit: 128m
+
+volumes:
+  anastate:
+
+networks:
+  core:
+    name: evactix-core
+    external: true

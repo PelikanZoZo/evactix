@@ -189,24 +189,3 @@ def test_runner_as_collector_role(db, raw, fixture_bytes):
         assert r.written > 0
     assert db.execute("select status, written from collector_runs").fetchone() == ("ok", r.written)
 
-
-def test_ana_tick(db, monkeypatch, tmp_path):
-    import psycopg
-    from evactix import ana as ana_mod
-    from evactix.config import Settings
-    sent = []
-    monkeypatch.setattr(ana_mod.Telegram, "send", lambda self, t: sent.append(t) or True)
-    monkeypatch.setattr(ana_mod, "check_edge", lambda: [])
-    db.execute("""insert into collector_runs (collector, source_id, started_at, finished_at, status, error)
-                  values ('cbr.fx','cbr.fx', now() - interval '5 days', now() - interval '5 days', 'ok', null),
-                         ('cbr.fx','cbr.fx', now() - interval '1 hour', now() - interval '1 hour', 'error', 'ConnectError: x')""")
-    s = Settings(db_host="127.0.0.1", db_user="ana", db_name=db.info.dbname, disk_path=str(tmp_path))
-    a = ana_mod.Ana(s)
-    a.tick()
-    assert any("нет свежих данных" in t for t in sent)
-    n = len(sent)
-    a.tick()                                   # повтор без напоминания — тишина (кроме уже отправленной сводки)
-    assert len(sent) == n
-    db.execute("insert into collector_runs (collector, source_id, started_at, finished_at, status) values ('cbr.fx','cbr.fx', now(), now(), 'ok')")
-    a.tick()
-    assert any(t.startswith("🟢 В норме") for t in sent[n:])

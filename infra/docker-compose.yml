@@ -97,22 +97,12 @@ services:
       - rawdata:/data/raw
     mem_limit: 256m
 
-  # Ана: сторож, только чтение данных, свои ключи, оповещения в Telegram
-  ana:
-    <<: *core
-    command: ["python", "-m", "evactix.ana"]
-    environment:
-      <<: *core-env
-      DB_USER: ana
-      DB_PASSWORD: ${ANA_DB_PASSWORD:?нужен ANA_DB_PASSWORD}
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
-      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
-      DISK_PATH: /data/raw
-    volumes:
-      - rawdata:/data/raw:ro
-    mem_limit: 128m
-
 volumes:
   dbdata:
   caddydata:
   rawdata:
+
+# Сеть ядра с постоянным именем: к ней подключается отдельный проект Аны (evactix-ana)
+networks:
+  default:
+    name: evactix-core

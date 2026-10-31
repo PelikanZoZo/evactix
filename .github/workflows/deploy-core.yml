@@ -1,8 +1,9 @@
 name: Выкатка ядра
 
 # Запускается сам после слияния изменений ядра в main, или вручную: Actions → «Выкатка ядра» → Run workflow.
-# Собирает образ на сервере, применяет миграции, перезапускает сборщики и Ану.
+# Собирает образ на сервере, применяет миграции, перезапускает сборщики.
 # Пароли ролей collector и ana генерируются на сервере один раз и в логи не попадают.
+# Ана — отдельный проект (папка ana/, workflow «Выкатка Аны»).
 
 on:
   push:
@@ -87,12 +88,9 @@ jobs:
       - name: Настройки (.env)
         env:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           # Значения идут через stdin, в командной строке и логах их нет
-          printf 'POSTGRES_PASSWORD=%s\nTELEGRAM_BOT_TOKEN=%s\nTELEGRAM_CHAT_ID=%s\nEVACTIX_VERSION=%s\n' \
-            "$POSTGRES_PASSWORD" "$TELEGRAM_BOT_TOKEN" "$TELEGRAM_CHAT_ID" "$GITHUB_SHA" \
+          printf 'POSTGRES_PASSWORD=%s\nEVACTIX_VERSION=%s\n' "$POSTGRES_PASSWORD" "$GITHUB_SHA" \
           | rsh -p "$P" "$U@$H" 'if [ "$(id -u)" = 0 ]; then python3 /tmp/evactix-deploy/core/deploy_env.py /opt/evactix/.env; else sudo -n python3 /tmp/evactix-deploy/core/deploy_env.py /opt/evactix/.env; fi'
 
       - name: Сборка, миграции, запуск
@@ -107,16 +105,12 @@ jobs:
           $D build -q collector
           echo "==> Миграции"
           $D run --rm -T migrate </dev/null
-          echo "==> Запуск сборщиков и Аны"
-          $D up -d --remove-orphans collector ana
+          echo "==> Запуск сборщиков"
+          $D up -d --remove-orphans collector
           sleep 60
           $D ps
           echo "==> Журнал сборщиков (последние строки)"
           $D logs --tail 30 collector
-          echo "==> Журнал Аны"
-          $D logs --tail 10 ana
-          echo "==> Telegram с сервера"
-          curl -s -o /dev/null -m 10 -w 'api.telegram.org: %{http_code}\n' https://api.telegram.org/ || echo "api.telegram.org: нет ответа"
           rm -rf /tmp/evactix-deploy
           REMOTE
 

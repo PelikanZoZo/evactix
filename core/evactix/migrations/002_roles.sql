@@ -18,6 +18,7 @@ grant update (name, source_class, base_confidence, license, url, max_age) on sou
 grant update (value_type, unit, aggregation, description) on metrics to collector;
 grant usage on sequence rejects_id_seq, collector_runs_id_seq to collector;
 
--- Ана: читает всё, пишет только своё состояние.
+-- Ана — отдельный проект рядом с ядром. Ядро только выдаёт ей ключ на чтение;
+-- своё состояние Ана хранит у себя.
 grant select on all tables in schema public to ana;
-grant insert, update, delete on ana_alerts, ana_state to ana;
+alter default privileges in schema public grant select on tables to ana;

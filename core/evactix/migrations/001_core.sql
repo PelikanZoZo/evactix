@@ -170,18 +170,3 @@ create table if not exists chain_heads (
     signature  text not null,
     updated_at timestamptz not null default now()
 );
-
--- Состояние тревог Аны
-create table if not exists ana_alerts (
-    key         text primary key,
-    level       text not null,
-    message     text not null,
-    first_seen  timestamptz not null default now(),
-    last_sent   timestamptz,
-    resolved_at timestamptz
-);
-create table if not exists ana_state (
-    key    text primary key,
-    value  jsonb not null,
-    updated_at timestamptz not null default now()
-);
