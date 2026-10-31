@@ -1,0 +1,46 @@
+name: Состояние ядра
+
+# Вручную: Actions → «Состояние ядра» → Run workflow. Ничего не меняет: последние сборы, объём данных,
+# пример погодного консенсуса, память контейнеров. Секретов в выводе нет.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    env:
+      SSHPASS: ${{ secrets.VPS_PASSWORD }}
+    steps:
+      - name: Подключение
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          H="$(echo -n "$VPS_HOST" | tr -d '[:space:]')"; P="$(echo -n "$VPS_PORT" | tr -d '[:space:]')"; U="$(echo -n "$VPS_USER" | tr -d '[:space:]')"
+          mkdir -p ~/.ssh ~/bin && chmod 700 ~/.ssh
+          if [ -n "$SSHPASS" ]; then
+            sudo apt-get install -y -qq sshpass >/dev/null
+            printf '#!/bin/bash\nexec sshpass -e ssh -o PubkeyAuthentication=no -o PreferredAuthentications=password,keyboard-interactive "$@"\n' > ~/bin/rsh
+          else
+            printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519; chmod 600 ~/.ssh/id_ed25519
+            printf '#!/bin/bash\nexec ssh "$@"\n' > ~/bin/rsh
+          fi
+          chmod +x ~/bin/rsh; echo "$HOME/bin" >> "$GITHUB_PATH"
+          ssh-keyscan -p "$P" -T 20 "$H" 2>/dev/null > ~/.ssh/known_hosts
+          { echo "H=$H"; echo "P=$P"; echo "U=$U"; } >> "$GITHUB_ENV"
+
+      - name: Состояние
+        run: |
+          rsh -p "$P" "$U@$H" 'bash -s' <<'REMOTE' | tee summary.txt
+          cd /opt/evactix
+          Q() { sudo -n docker compose exec -T db psql -U evactix -d evactix -P pager=off "$@" 2>/dev/null || docker compose exec -T db psql -U evactix -d evactix -P pager=off "$@"; }
+          Q -c "select collector, status, written, skipped, rejected, to_char(started_at,'DD HH24:MI') as started, round(extract(epoch from finished_at-started_at))::int as sec, left(coalesce(error,''),90) as error from collector_runs order by id desc limit 25" </dev/null
+          Q -c "select source_id, count(*) as events, max(observed_at) as last_issue, max(occurred_at) as to_time from events where recorded_at > now() - interval '2 days' group by 1 order by 1" </dev/null
+          Q -c "select to_char(occurred_at,'DD HH24:MI') as at, metric, value->>'v' as v, round(confidence::numeric,2) as conf, payload from events e where source_id='weather.consensus' and subject->0->>'id'='point:moscow' and occurred_at between now() and now()+interval '12 hours' and recorded_at=(select max(recorded_at) from events x where x.dedup_key=e.dedup_key) order by occurred_at, metric limit 40" </dev/null
+          sudo -n docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}' 2>/dev/null || docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}'
+          free -m; df -h / | tail -1
+          REMOTE
+          { echo '### Состояние ядра'; echo '```'; cat summary.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
