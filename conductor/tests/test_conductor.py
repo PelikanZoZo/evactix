@@ -8,7 +8,7 @@ import psycopg
 import pytest
 
 from conductor import jobs, outbox, service
-from conductor.cron import Cron, describe
+from conductor.cron import MSK, Cron, describe
 from conductor.jobs import Author, JobError
 
 from .conftest import tool_call
@@ -42,7 +42,7 @@ def test_cron_next_and_words():
 def test_create_rules(conn, settings):
     service.ensure_owner(conn, settings)
     jid = jobs.create(conn, {"title": "Позвонить", "action": "remind", "message": "Позвонить Иванову",
-                             "run_at": (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d %H:%M")}, USER)
+                             "run_at": (datetime.now(MSK) + timedelta(days=1)).strftime("%Y-%m-%d %H:%M")}, USER)
     j = jobs.get(conn, jid)
     assert j["schedule"] == "once" and j["author_name"] == "Денис (Telegram)" and j["recipients"] == [{"id": 1}]
     with pytest.raises(JobError, match="не меньше 5"):
@@ -88,7 +88,7 @@ def test_remind_once_and_send(conn, settings, make_llm):
     service.ensure_owner(conn, settings)
     llm, _ = make_llm([])
     jid = jobs.create(conn, {"title": "Позвонить", "message": "Позвонить Иванову",
-                             "run_at": (datetime.now() + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M")}, USER)
+                             "run_at": (datetime.now(MSK) + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M")}, USER)
     due(conn, jid)
     assert tick(conn, llm) == 1
     j = jobs.get(conn, jid)
