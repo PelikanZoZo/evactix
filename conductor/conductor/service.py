@@ -69,6 +69,20 @@ def ensure_system_jobs(conn) -> list[int]:
     return made
 
 
+RETRY_FAILED_COLLECT = "15 minutes"
+
+
+def retry_failed_collects(conn) -> int:
+    """Последняя команда сбора упала (сеть, сборщик ещё не выкачен) — повторить через 15 минут, а не через полный интервал."""
+    return conn.execute(f"""
+        update jobs.jobs j set next_run_at = now()
+        where j.system_key like 'collect:%%' and j.status = 'active'
+          and j.next_run_at > now() + interval '20 minutes'
+          and exists (select 1 from jobs.commands c
+                      where c.id = (select max(id) from jobs.commands where job_id = j.id)
+                        and c.status = 'failed' and c.finished_at < now() - interval '{RETRY_FAILED_COLLECT}')""").rowcount
+
+
 def heartbeat(conn) -> None:
     conn.execute("""insert into jobs.heartbeat (id, at, version) values (1, now(), %s)
                     on conflict (id) do update set at=now(), version=excluded.version""", (__version__,))
@@ -148,6 +162,7 @@ def execute(conn, j: dict, llm: DeepSeek, manual: bool = False) -> str:
 
 def scheduler_tick(conn, llm: DeepSeek, limit: int = 20) -> int:
     heartbeat(conn)
+    retry_failed_collects(conn)
     done = 0
     for _ in range(limit):
         with conn.transaction():
